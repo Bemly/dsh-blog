@@ -1,0 +1,18 @@
+{
+  "name": "dsh-blog",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "dsh-TUI 的 Web 版「Canvas 真 TUI」",
+  "scripts": {
+    "dev": "bun run serve.ts",
+    "build": "bun run build.ts",
+    "preview": "bun run preview.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run build"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dsh-TUI — Canvas 真 TUI</title>
+  <link rel="icon" href="data:," />
+  <style>
+    html, body { margin: 0; padding: 0; background: #2A2F34; overflow: hidden; }
+    #tui {
+      position: fixed; inset: 0;
+      width: 100vw; height: 100vh;
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      cursor: text;
+    }
+    /* 像素层：真像素绘制（立绘 / 开屏大字），由 pixel-layer.ts 创建 */
+    #pixel-layer {
+      position: fixed; left: 0; top: 0;
+      pointer-events: none;
+      z-index: 10;
+      image-rendering: pixelated;
+    }
+    /* 隐藏输入框：承载 IME / 粘贴，位置跟随画布光标（由 app.ts 创建） */
+    #tui-ime {
+      position: fixed; left: 0; top: 0;
+      width: 1px; height: 1px;
+      opacity: 0; border: 0; padding: 0; margin: 0;
+      resize: none; overflow: hidden;
+      background: transparent; color: transparent;
+      caret-color: transparent;
+      font-size: 16px; line-height: 1;
+      z-index: 30;
+    }
+  </style>
+</head>
+<body>
+  <!-- Canvas 是唯一渲染载体：所有界面元素（顶栏/面板/消息/输入/宠物）
+       均通过字符网格逐帧绘制，禁止 DOM 拼装 UI。
+       像素立绘与像素大字走独立 PixelLayer，按设备像素整数对齐。 -->
+  <canvas id="tui"></canvas>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
