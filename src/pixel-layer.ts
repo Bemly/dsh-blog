@@ -105,6 +105,20 @@ function imageSub(img: HTMLImageElement, sx: number, sy: number, sw: number, sh:
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
+/** 精灵图里的一格：插画素材用，高质量插值（缩放比例非整数时不会锯齿）。 */
+function imageSubSmooth(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void {
+  if (ctx === null) return;
+  if (!sw || !sh) return;
+  const dx = D(x);
+  const dy = D(y);
+  const dw = Math.max(1, D(x + w) - dx);
+  const dh = Math.max(1, D(y + h) - dy);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  ctx.imageSmoothingEnabled = false;
+}
+
 /** 图片：高质量缩放（高清立绘不是整数倍像素网格）。 */
 function imageSmooth(img: HTMLImageElement, x: number, y: number, w: number, h: number): void {
   if (ctx === null || !img) return;
@@ -152,6 +166,7 @@ export const PixelLayer: PixelLayerApi = {
   end,
   imageAt,
   imageSub,
+  imageSubSmooth,
   imageSmooth,
   cells,
   rect,

@@ -200,6 +200,7 @@ export interface PixelLayerApi {
   end(): void;
   imageAt(img: HTMLImageElement, x: number, y: number, w: number, h: number): void;
   imageSub(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void;
+  imageSubSmooth(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void;
   imageSmooth(img: HTMLImageElement, x: number, y: number, w: number, h: number): void;
   cells(x: number, y: number, cw: number, ch: number, rows: PixelRows, palette: Record<string, string> | null): void;
   rect(x0: number, y0: number, x1: number, y1: number, color: string): void;
@@ -218,6 +219,8 @@ export interface SheetArt {
   readonly dir: string;
   readonly cell: readonly [number, number];
   readonly timings: ImageTimings;
+  /** 插画类素材：缩小时走高质量插值（像素画不能开，否则糊边） */
+  readonly smooth?: boolean;
 }
 
 /** 宠物当前加载的素材包。 */

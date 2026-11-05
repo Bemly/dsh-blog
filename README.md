@@ -58,12 +58,14 @@ assets/
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
   claude-girl-sheet/    Claude 娘 AVIF 精灵图（22 张 / 225 帧）
   codex-girl-sheet/     Codex 娘 AVIF 精灵图（22 张 / 225 帧）
+  whale-maid-sheet/     鲸娘女仆 Q 版插画精灵图（22 张 / 384 帧，489×709）
+  whale-maid-anime-sheet/ 鲸娘女仆动画精灵图（22 张 / 880 帧，540×540）
   portraits/            高清立绘：whale-girl（女仆鲸娘，normal + happy）
 ```
 
 ## 角色形象（原版搬运，可在设置里选）
 
-`src/app.ts` 的 `SKINS` 名册 = 6 个形象，对应 dsh-TUI 的资产：
+`src/app.ts` 的 `SKINS` 名册 = 8 个形象（像素画 3 + 插画 2 + 立绘 1 + 字符动画 2）：
 
 | id | 名称 | 形态 | 素材 |
 |---|---|---|---|
@@ -71,6 +73,8 @@ assets/
 | `claude-girl` | Claude 娘 | 原生像素帧 22 动画 / 225 帧（AVIF 精灵图） | `assets/claude-girl-sheet/` |
 | `codex-girl` | Codex 娘 | 原生像素帧 22 动画 / 225 帧（AVIF 精灵图） | `assets/codex-girl-sheet/` |
 | `maid-girl` | 鲸娘 · 女仆 | 高清立绘 464×464（+ happy，没有动画帧） | `assets/portraits/whale-girl/` |
+| `whale-maid` | 鲸娘 · 女仆 Q版 | 插画序列帧 22 动画 / 384 帧（489×709） | `assets/whale-maid-sheet/` |
+| `whale-maid-anime` | 鲸娘 · 女仆 动画 | 插画序列帧 22 动画 / 880 帧（540×540，源 720 缩 0.75） | `assets/whale-maid-anime-sheet/` |
 | `deepy` | deepy | 42×30 字符动画 ×20 | `src/data/deepy.ts` |
 | `whale` | 小鲸鱼 | 40×25 字符帧 ×22 | `src/data/whale.ts` |
 
@@ -86,11 +90,16 @@ assets/
 三个形象共用同一套 301×288 原生像素帧（288px 高、保留真实 alpha），
 分别来自 dsh-TUI / 表情包素材包：
 
-| 形象 | 帧数 | 精灵图体积 |
-|---|---|---|
-| 鲸娘 | 267 | 1.3 MB |
-| Claude 娘 | 225 | 2.3 MB |
-| Codex 娘 | 225 | 2.1 MB |
+| 形象 | 帧数 | 单格 | 精灵图体积 |
+|---|---|---|---|
+| 鲸娘 | 267 | 301×288 | 1.3 MB |
+| Claude 娘 | 225 | 301×288 | 2.3 MB |
+| Codex 娘 | 225 | 301×288 | 2.1 MB |
+| 鲸娘女仆 Q版 | 384 | 489×709 | 8.6 MB |
+| 鲸娘女仆 动画 | 880 | 540×540 | 19 MB |
+
+前三个是像素画，缩放走最近邻 + 整数物理像素；后两个是插画，`SheetArt.smooth`
+让它们走 `imageSubSmooth`（高质量插值），否则非整数倍缩放会锯齿。
 
 - 运行时用的是 `assets/<skin>-sheet/<key>.avif`：**一个动画一张 AVIF 精灵图**，
   由 `tools/encode-sheet.ts` 生成（`ffmpeg` 拼 `tile` + `avifenc -q 60 --qalpha 60 -s 0`）；
@@ -107,7 +116,7 @@ assets/
 
 ```bash
 bun run encode:sheet                                   # 默认：assets/whalegirl/ → assets/whalegirl-sheet/
-bun run encode:sheet claude-girl <源目录>              # 指定角色与源目录（PNG/WebP 均可）
+bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]   # 例：whale-maid-anime <dir> 0.75 85
 ```
 
 > Claude 娘 / Codex 娘的逐帧源图（各 225 张 PNG，约 15MB）没有入库，放在素材包目录里；
@@ -173,7 +182,7 @@ bun run encode:sheet claude-girl <源目录>              # 指定角色与源�
 - 启动页立绘被字符网格压扁（42×30 素材按正方形像素渲染，横向拉宽 31%），
   且加载的是低分辨率字符格；现改为原版原生像素帧 + 正确像素比；
 - 补齐 dsh-TUI 的 Claude 娘 / Codex 娘 / 鲸娘女仆高清立绘，并做成可选形象
-  （6 个形象 + 实时预览选择器 + localStorage 记忆）；
+  （8 个形象 + 实时预览选择器 + localStorage 记忆）；
 - 开屏大字用字体字形画 `█/▀/▄`，字形行高留白导致横条状断层；现改为像素层矩形；
 - 弹层边框/分隔线改用 1px 实线（字符网格画不齐）；
 - 设置页控件命中被整行命中吞掉、开关错位；

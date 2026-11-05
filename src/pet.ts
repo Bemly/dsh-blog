@@ -28,15 +28,18 @@ import { DEEPY } from './data/deepy.ts';
 import { WHALEGIRL } from './data/whalegirl.ts';
 import { WHALE_FRAMES } from './data/whale.ts';
 import { CLAUDE_GIRL_SPRITE, WHALE_GIRL_SPRITE } from './data/girls.ts';
-import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, WHALEGIRL_IMG } from './data/timings.ts';
+import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, MAID_ANIME_IMG, MAID_IMG, WHALEGIRL_IMG } from './data/timings.ts';
 
-/** 精灵图单格尺寸（源帧统一 301×288）。 */
+/** 精灵图单格尺寸（像素画统一 301×288）。 */
 const CELL: readonly [number, number] = [301, 288];
 /** 走 AVIF 精灵图轨的形象（一个动画一张图）。 */
 const SHEETS: Record<string, SheetArt> = {
   whalegirl: { dir: 'assets/whalegirl-sheet/', cell: CELL, timings: WHALEGIRL_IMG },
   'claude-girl': { dir: 'assets/claude-girl-sheet/', cell: CELL, timings: CLAUDE_GIRL_IMG },
   'codex-girl': { dir: 'assets/codex-girl-sheet/', cell: CELL, timings: CODEX_GIRL_IMG },
+  // 插画素材：非像素画，缩放走高质量插值
+  'whale-maid': { dir: 'assets/whale-maid-sheet/', cell: [489, 709], timings: MAID_IMG, smooth: true },
+  'whale-maid-anime': { dir: 'assets/whale-maid-anime-sheet/', cell: [540, 540], timings: MAID_ANIME_IMG, smooth: true },
 };
 const PT_DIR = 'assets/portraits/';
 const SPLASH_PALETTE: Record<string, string> = {
@@ -445,18 +448,30 @@ export class Player implements Pet {
     if (pk.type === 'sheet') {
       const cell = this.frameCell();
       if (cell !== null) {
-        // 1 源像素 = 整数个物理像素（最近邻放大才不会糊）
-        const dpr = window.devicePixelRatio || 1;
-        const k = Math.max(1, Math.round(dpr));
-        let dw = (cell.w * k) / dpr;
-        let dh = (cell.h * k) / dpr;
-        if (dw > w || dh > h) {
-          const s = Math.min(w / dw, h / dh);
-          dw *= s;
-          dh *= s;
+        const art = pk.sheet!;
+        let dw: number;
+        let dh: number;
+        if (art.smooth === true) {
+          // 插画：等比缩放到槽位内，走高质量插值
+          const sc = Math.min(w / cell.w, h / cell.h);
+          dw = cell.w * sc;
+          dh = cell.h * sc;
+          layer.imageSubSmooth(cell.img, cell.sx, cell.sy, cell.w, cell.h,
+            x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        } else {
+          // 像素画：1 源像素 = 整数个物理像素（最近邻放大才不会糊）
+          const dpr = window.devicePixelRatio || 1;
+          const k = Math.max(1, Math.round(dpr));
+          dw = (cell.w * k) / dpr;
+          dh = (cell.h * k) / dpr;
+          if (dw > w || dh > h) {
+            const s = Math.min(w / dw, h / dh);
+            dw *= s;
+            dh *= s;
+          }
+          layer.imageSub(cell.img, cell.sx, cell.sy, cell.w, cell.h,
+            x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
         }
-        layer.imageSub(cell.img, cell.sx, cell.sy, cell.w, cell.h,
-          x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
         return;
       }
     }
