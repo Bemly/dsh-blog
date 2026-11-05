@@ -135,6 +135,21 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 - 鲸娘 poke 之后接 `smile-hearts`（2.4s）；
 - 900ms 内连点 ≥3 次 → `tickle`。
 
+## 侧栏伙伴（⌘B）
+
+右侧面板第一页「♥」把宠物搬进侧栏（移植自 dsh-TUI 的 `CompanionPanel`）：宠物常驻面板
+底部，上方四行是 **心情 / 一句话 / 当前动作 / 互动提示**，中间留白让立绘不贴字。
+
+- 心情由 `app.ts` 的 `updatePet()` 写入 `state.petMood`（睡觉 / 发呆 / 思考中 / 工作中 /
+  完成啦 / 需要你 / 出错了），面板据此换色与文案；
+- 点左半 / 右半 → `poke-left` / `poke-right`；900ms 内连点 ≥3 次 → `tickle`；
+- 悬停 → `idle-look`；流式回合结束 → `happy`（2.5s 庆祝）；
+- 按住拖动可把宠物拎起来（`drag` 姿态，跟手且不出面板），松手按指数插值回 home（τ≈100ms）。
+
+几何全部走字符坐标：槽位与拖动边界由 `tui-ui.ts` 的 `companionPetRect()` /
+`companionLimits()` 提供，`app.ts` 只记像素偏移 `state.petOffset`，帧循环里的
+`tickPetOffset()` 负责回弹。
+
 ## 交互
 
 | 按键 | 作用 |
@@ -142,7 +157,7 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 | `Enter` | 发送 / 确认 |
 | `Tab` | 切换 NORMAL / INSERT |
 | `⌘K` | 命令菜单（可输入过滤） |
-| `⌘B` | 切换右侧面板 |
+| `⌘B` | 切换右侧面板（默认「♥ 伙伴」页，侧栏宠物） |
 | `⌘T` / `⌘R` / `⌘E` | Todos / Jobs / 上下文 |
 | `⌘P` | 参数行 |
 | `⌘,` | 设置 |

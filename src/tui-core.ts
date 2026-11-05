@@ -391,7 +391,8 @@ function onMouseDown(e: MouseEvent): void {
 function onMouseMove(e: MouseEvent): void {
   const c = pxToCell(e.clientX, e.clientY);
   Input.lastMouse = { x: e.clientX, y: e.clientY, col: c.col, row: c.row, btn: Input.lastMouse.btn };
-  Input.move?.(c.col, c.row, e);
+  // 回调按接口约定传 CSS 像素（app 侧再自己换算字符坐标）。
+  Input.move?.(e.clientX, e.clientY, e);
 }
 
 function onMouseUp(e: MouseEvent): void {

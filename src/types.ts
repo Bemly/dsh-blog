@@ -249,6 +249,8 @@ export interface Pet {
   tick(dt: number): void;
   setMood(mood: string): void;
   click(fracX: number): void;
+  /** 侧栏拖拽：按住时切 `drag` 姿态，松手恢复。 */
+  hold(on: boolean): void;
   interact(): void;
   frameRows(): string[] | null;
   frameCell(): SheetFrame | null;
@@ -449,6 +451,16 @@ export interface AppState {
   launchTitle: string;
   showPet: boolean;
   launchFocus: boolean;
+  /** 侧栏伙伴：当前心情键（updatePet 写入，面板据此显示文案）。 */
+  petMood: string;
+  /** 侧栏伙伴拖动位移（CSS 像素）；非 0 时宠物离开 home 位。 */
+  petOffset: { x: number; y: number };
+  /** 正在拖拽（松手后由帧循环弹回）。 */
+  petDragging: boolean;
+  /** 指针停在侧栏宠物上（切 idle-look）。 */
+  petHover: boolean;
+  /** 回合完成后的庆祝截止时间戳（ms）。 */
+  petCelebrateUntil: number;
   cwd: string;
   branch: string;
   paramRow: ParamSeg[];
@@ -460,11 +472,31 @@ export interface AppState {
   tip: string;
 }
 
+/** 侧栏宠物可拖动范围（相对 home 位的 CSS 像素偏移上下限）。 */
+export interface PetDragLimits {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/** 宠物槽位（CSS 像素）。 */
+export interface PetRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /** UI 层读取的应用 API。 */
 export interface AppApi {
   state: AppState;
   readonly pet: Pet | null;
   readonly _hits: Hit[];
+  /** 侧栏伙伴宠物槽位（未加拖动位移）；面板不可见时 null。 */
+  companionPetRect(): PetRect | null;
+  /** 侧栏伙伴拖动偏移上限；面板不可见时 null。 */
+  companionLimits(): PetDragLimits | null;
   dateLabel(t: number | Date): string;
   allSessionIds(): string[];
   reportCaret(col: number, row: number): void;

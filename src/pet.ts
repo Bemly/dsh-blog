@@ -56,7 +56,7 @@ const PORTRAITS: Record<string, PortraitArt> = {
 const MOOD_ANIM: Record<string, string> = {
   sleeping: 'sleeping', waking: 'waking', thinking: 'thinking', typing: 'typing',
   idle: 'idle', working: 'building', error: 'error', attention: 'notification',
-  celebrate: 'happy', waiting: 'idle-look',
+  celebrate: 'happy', waiting: 'idle-look', drag: 'drag',
 };
 const INTERACT_ANIMS: readonly string[] = ['poke-left', 'poke-right', 'tickle', 'drag', 'happy', 'music', 'conducting', 'swim'];
 
@@ -332,6 +332,17 @@ export class Player implements Pet {
       imageAnim(this.sheet, this.override.key);
       if (this.heartAfter) imageAnim(this.sheet, 'smile-hearts');
     }
+  }
+
+  /** 侧栏拖拽：按住期间覆盖 `drag` 姿态，松手清掉覆盖。 */
+  hold(on: boolean): void {
+    if (on) {
+      this.override = { key: 'drag', start: this.time, until: Number.POSITIVE_INFINITY };
+      this.heartAfter = false;
+      if (this.sheet !== null) imageAnim(this.sheet, 'drag');
+      return;
+    }
+    if (this.override !== null && this.override.key === 'drag') this.override = null;
   }
 
   interact(): void {

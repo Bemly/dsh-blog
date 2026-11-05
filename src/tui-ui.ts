@@ -9,7 +9,8 @@
    命中：每帧把可点击区 push 到 App._hits，鼠标由 App 分发。
    ═══════════════════════════════════════════════════════════ */
 import type {
-  AppApi, Block, CommandDef, Hit, PixelLayerApi, RenderToken, SkinDef, Token,
+  AppApi, Block, CommandDef, Hit, PetDragLimits, PetRect, PixelLayerApi, RenderToken,
+  SkinDef, Token,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { PixelLayer } from './pixel-layer.ts';
@@ -306,6 +307,7 @@ function drawPanel(): void {
     x += tabW;
   }
   TUI.hline(P.x + 1, P.y + 1, P.w - 2, T().border, T().panel);
+  if (App.state.panelTab === 'companion') { drawCompanion(P); return; }
   const area: Rect = { x: P.x + 2, y: P.y + 2, w: P.w - 4, h: P.h - 3 };
   const data = App.state.panelData[App.state.panelTab] ?? [];
   let y = area.y;
@@ -331,6 +333,100 @@ function drawPanel(): void {
     }
     if ('gap' in item && item.gap === true) y += 1;
   }
+}
+
+
+// ── 侧栏伙伴（移植 dsh-TUI CompanionPanel 的版式与互动）─────
+/** 状态区固定行数：心情 / 短语 / 当前动作 / 互动提示。 */
+const COMPANION_STATUS_ROWS = 4;
+
+const MOOD_LABEL: Record<string, string> = {
+  sleeping: '睡觉中', idle: '发呆', thinking: '思考中', typing: '工作中',
+  working: '工作中', waiting: '等待回复', attention: '需要你',
+  celebrate: '完成啦', error: '出错了', drag: '被拎起来',
+};
+
+function moodColor(mood: string): string {
+  if (mood === 'celebrate') return T().green;
+  if (mood === 'error') return T().red;
+  if (mood === 'attention') return T().yellow;
+  if (mood === 'sleeping') return T().dim;
+  return T().accent;
+}
+
+/** 心情的一句话（原版 bubble 的派生层，这里按心情给固定短语）。 */
+function companionPhrase(mood: string): string {
+  switch (mood) {
+    case 'typing': return '正在回复…';
+    case 'thinking': return '让我想想…';
+    case 'waiting': return '等你说话';
+    case 'celebrate': return '搞定啦！';
+    case 'error': return '出了点问题';
+    case 'attention': return '需要你看一眼';
+    case 'sleeping': return '呼…呼…';
+    case 'drag': return '放我下来～';
+    default: return '';
+  }
+}
+
+/** 宠物槽位：面板底部居中，占面板高约 6 成。 */
+function companionSlot(panel: Rect): Rect {
+  const avail = Math.max(4, panel.h - COMPANION_STATUS_ROWS - 2);
+  const h = Math.max(4, Math.floor(avail * 0.62));
+  return { x: panel.x + 1, y: panel.y + panel.h - 1 - h, w: Math.max(4, panel.w - 2), h };
+}
+
+function drawCompanion(panel: Rect): void {
+  if (App === null) return;
+  const mood = App.state.petMood;
+  const slot = companionSlot(panel);
+  const meta = App.skinMeta(App.state.skin);
+  const x = panel.x + 2;
+  const w = panel.w - 4;
+  TUI.fill(panel.x + 1, panel.y + 2, panel.w - 2, panel.h - 3, { bg: T().panel });
+
+  TUI.text(x, panel.y + 2, '●', moodColor(mood), T().panel, ST.BOLD);
+  TUI.text(x + 2, panel.y + 2, clipLine(MOOD_LABEL[mood] ?? '发呆', w - 2), T().fg, T().panel);
+  const phrase = companionPhrase(mood);
+  if (phrase !== '') TUI.text(x, panel.y + 3, clipLine(`⏵ ${phrase}`, w), T().dim, T().panel);
+  TUI.text(x, panel.y + 4, clipLine(`当前动作：${meta.label}`, w), T().dim, T().panel);
+  TUI.text(x, panel.y + 5, clipLine('点它戳一戳 · 连点挠痒痒 · 拖拽拎起来', w), T().dim, T().panel);
+
+  const cw = TUI.cw;
+  const ch = TUI.ch;
+  const off = App.state.petOffset;
+  if (App.pet !== null) {
+    App.pet.renderTo(PixelLayer, slot.x * cw + off.x, slot.y * ch + off.y, slot.w * cw, slot.h * ch);
+  }
+  // 命中区跟着拖动位移走；左右半区用于 poke-left / poke-right。
+  const dx = Math.round(off.x / cw);
+  const dy = Math.round(off.y / ch);
+  const half = Math.max(1, Math.floor(slot.w / 2));
+  hit('petside:left', slot.x + dx, slot.y + dy, half, slot.h, 'petside:left', meta.label);
+  hit('petside:right', slot.x + dx + half, slot.y + dy, Math.max(1, slot.w - half), slot.h, 'petside:right', meta.label);
+}
+
+/** 宠物槽位的 CSS 像素矩形（未加拖动位移）；面板不可见时 null。 */
+function companionPetRect(): PetRect | null {
+  if (App === null || !App.state.panelOpen || App.state.panelTab !== 'companion') return null;
+  const P = layout().panel;
+  if (P.w <= 0) return null;
+  const s = companionSlot(P);
+  return { x: s.x * TUI.cw, y: s.y * TUI.ch, w: s.w * TUI.cw, h: s.h * TUI.ch };
+}
+
+/** 拖动偏移上限：宠物整体不许出面板。 */
+function companionLimits(): PetDragLimits | null {
+  if (App === null || !App.state.panelOpen || App.state.panelTab !== 'companion') return null;
+  const P = layout().panel;
+  if (P.w <= 0) return null;
+  const s = companionSlot(P);
+  return {
+    minX: Math.min(0, (P.x - s.x) * TUI.cw),
+    maxX: Math.max(0, (P.x + P.w - (s.x + s.w)) * TUI.cw),
+    minY: Math.min(0, (P.y + 2 - s.y) * TUI.ch),
+    maxY: Math.max(0, (P.y + P.h - 1 - (s.y + s.h)) * TUI.ch),
+  };
 }
 
 // ── 消息区 ─────────────────────────────────────────────────
@@ -1195,6 +1291,8 @@ export const UI = {
   setApp,
   layout,
   launchGeom,
+  companionPetRect,
+  companionLimits,
   drawAll,
   drawMessages,
   drawPanel,

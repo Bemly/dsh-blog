@@ -95,10 +95,10 @@ const state: AppState = {
 
   panelOpen: false,
   panelTabs: [
-    { id: 'todos', label: 'Todos' }, { id: 'jobs', label: 'Jobs' },
-    { id: 'context', label: 'Ctx' }, { id: 'tips', label: 'Tips' }, { id: 'themes', label: 'Themes' },
+    { id: 'companion', label: '♥' }, { id: 'todos', label: '✓' }, { id: 'jobs', label: '⚙' },
+    { id: 'context', label: '◫' }, { id: 'tips', label: '?' }, { id: 'themes', label: '◐' },
   ] satisfies PanelTab[],
-  panelTab: 'todos',
+  panelTab: 'companion',
   panelData: {
     todos: [
       { type: 'head', text: '当前任务' },
@@ -187,6 +187,12 @@ const state: AppState = {
   launchTitle: 'dsh-TUI',
   showPet: true,
 
+  petMood: 'idle',
+  petOffset: { x: 0, y: 0 },
+  petDragging: false,
+  petHover: false,
+  petCelebrateUntil: 0,
+
   launchFocus: true,
   cwd: '~/Projects/dsh-blog',
   branch: 'main',
@@ -225,6 +231,7 @@ const COMMANDS: CommandDef[] = [
   { id: 'cmdmenu', label: '⌘ 命令菜单', key: '⌘K', desc: '所有快捷指令', action: 'cmdmenu' },
   { id: 'help', label: '? 快捷键帮助', key: '?', desc: '查看按键说明', action: 'help' },
   { id: 'settings', label: '⚙ 打开设置', key: '⌘,', desc: '主题 / 宠物 / 偏好', action: 'settings' },
+  { id: 'panel-companion', label: '♥ 侧栏伙伴', key: '⌘B', desc: '侧栏宠物 / 戳一戳', action: 'panel:companion' },
   { id: 'panel-todos', label: '右侧面板 · Todos', key: '⌘T', desc: '切换待办', action: 'panel:todos' },
   { id: 'panel-jobs', label: '右侧面板 · Jobs', key: '⌘R', desc: '切换任务', action: 'panel:jobs' },
   { id: 'panel-context', label: '右侧面板 · Context', key: '⌘E', desc: '切换上下文', action: 'panel:context' },
@@ -379,6 +386,7 @@ function streamTick(dt: number): void {
     state.streaming = false;
     state.streamSessionId = null;
     state.streamAcc = '';
+    state.petCelebrateUntil = now() + 2500;
     lastActivity = now();
   } else if (state.autoScroll && !state.userScrolled) {
     state.scroll = 999999;
@@ -425,10 +433,21 @@ function clearSessions(): void {
   newChat();
 }
 
+function resetCompanion(): void {
+  state.petOffset.x = 0;
+  state.petOffset.y = 0;
+  state.petDragging = false;
+  state.petHover = false;
+  dragBase = null;
+  pet.hold(false);
+}
+
 function togglePanel(tab?: string): void {
-  if (tab === undefined) { state.panelOpen = !state.panelOpen; return; }
-  if (state.panelOpen && state.panelTab === tab) state.panelOpen = false;
-  else { state.panelOpen = true; state.panelTab = tab; }
+  if (tab === undefined) { state.panelOpen = !state.panelOpen; if (!state.panelOpen) resetCompanion(); return; }
+  if (state.panelOpen && state.panelTab === tab) { state.panelOpen = false; resetCompanion(); return; }
+  state.panelOpen = true;
+  state.panelTab = tab;
+  if (tab !== 'companion') resetCompanion();
 }
 
 function toggleOverlay(ov: AppState['overlay']): void {
@@ -898,7 +917,43 @@ function sendInput(): void {
 }
 
 // ── 输入：鼠标 / 滚轮 ──────────────────────────────────────
-function onDown(col: number, row: number): void {
+interface DragBase { px: number; py: number; x: number; y: number }
+let dragBase: DragBase | null = null;
+
+/** 侧栏宠物：按住 → 拖拽跟手（clamp 在面板内）；松手 → 交给帧循环弹回。 */
+function startPetDrag(e: MouseEvent): void {
+  dragBase = { px: e.clientX, py: e.clientY, x: state.petOffset.x, y: state.petOffset.y };
+  state.petDragging = true;
+  pet.hold(true);
+  lastActivity = now();
+}
+
+function endPetDrag(e: MouseEvent, allowClick: boolean): void {
+  const base = dragBase;
+  if (base === null) return;
+  dragBase = null;
+  state.petDragging = false;
+  pet.hold(false);
+  lastActivity = now();
+  if (!allowClick) return;
+  const moved = Math.hypot(e.clientX - base.px, e.clientY - base.py);
+  if (moved >= 8) return;
+  const rect = UI.companionPetRect();
+  const frac = rect !== null && rect.w > 0
+    ? (e.clientX - (rect.x + base.x)) / rect.w
+    : 0.5;
+  pet.click(Math.max(0, Math.min(1, frac)));
+}
+
+function petHoverAt(px: number, py: number): boolean {
+  const rect = UI.companionPetRect();
+  if (rect === null) return false;
+  const x = rect.x + state.petOffset.x;
+  const y = rect.y + state.petOffset.y;
+  return px >= x && px < x + rect.w && py >= y && py < y + rect.h;
+}
+
+function onDown(col: number, row: number, _btn: number, e: MouseEvent): void {
   focusIme();
   if (state.screen === 'chat' && state.overlay === null) state.focusInput = true;
   if (state.screen === 'launchpad' && state.overlay === null) state.launchFocus = true;
@@ -906,6 +961,7 @@ function onDown(col: number, row: number): void {
     const h = hits[i];
     if (h === undefined) continue;
     if (col >= h.x && col < h.x + h.w && row >= h.y && row < h.y + h.h) {
+      if (h.action !== null && h.action.startsWith('petside:')) { startPetDrag(e); return; }
       dispatch(h.action);
       return;
     }
@@ -918,17 +974,40 @@ function onMove(px: number, py: number): void {
   const cell = TUI.pxToCell(px, py);
   let ph: string | null = null;
   let ah: string | null = null;
-  let hover = false;
+  let overHit = false;
   for (const h of hits) {
     if (cell.col >= h.x && cell.col < h.x + h.w && cell.row >= h.y && cell.row < h.y + h.h) {
       if (h.id.startsWith('param:')) ph = h.id.slice(6);
       if (h.id.startsWith('action:')) ah = h.id.slice(7);
-      hover = true;
+      overHit = true;
     }
   }
   state.paramHover = ph;
   state.actionHover = ah;
-  document.body.style.cursor = hover ? 'pointer' : 'text';
+  state.petHover = petHoverAt(px, py);
+  if (dragBase !== null) {
+    const lim = UI.companionLimits();
+    const nx = dragBase.x + (px - dragBase.px);
+    const ny = dragBase.y + (py - dragBase.py);
+    state.petOffset.x = lim === null ? nx : Math.max(lim.minX, Math.min(lim.maxX, nx));
+    state.petOffset.y = lim === null ? ny : Math.max(lim.minY, Math.min(lim.maxY, ny));
+    lastActivity = now();
+  }
+  const grab = dragBase !== null;
+  document.body.style.cursor = grab ? 'grabbing' : (state.petHover ? 'grab' : (overHit ? 'pointer' : 'text'));
+}
+
+function onUp(_col: number, _row: number, _btn: number, e: MouseEvent): void {
+  endPetDrag(e, true);
+}
+
+function onLeave(): void {
+  state.petHover = false;
+  if (dragBase !== null) {
+    dragBase = null;
+    state.petDragging = false;
+    pet.hold(false);
+  }
 }
 
 function onWheel(dy: number): void {
@@ -941,12 +1020,17 @@ function onWheel(dy: number): void {
 // ── 宠物情绪驱动 ───────────────────────────────────────────
 function updatePet(): void {
   const idleFor = now() - lastActivity;
-  if (state.streaming) pet.setMood('typing');
-  else if (state.screen === 'launchpad') pet.setMood('idle');
-  else if (state.screen === 'settings') pet.setMood('idle-look');
-  else if (idleFor > 45000) pet.setMood('sleeping');
-  else if (idleFor < 3000 && state.inputText.length === 0) pet.setMood('thinking');
-  else pet.setMood('idle');
+  let mood: string;
+  if (now() < state.petCelebrateUntil) mood = 'celebrate';
+  else if (state.streaming) mood = 'typing';
+  else if (state.petHover) mood = 'idle-look';
+  else if (state.screen === 'launchpad') mood = 'idle';
+  else if (state.screen === 'settings') mood = 'idle-look';
+  else if (idleFor > 45000) mood = 'sleeping';
+  else if (idleFor < 3000 && state.inputText.length === 0) mood = 'thinking';
+  else mood = 'idle';
+  state.petMood = mood;
+  pet.setMood(mood);
 }
 
 function tickTips(): void {
@@ -961,6 +1045,18 @@ function tickCursor(dt: number): void {
 }
 
 // ── 帧循环 ─────────────────────────────────────────────────
+/** 松手后的回弹：指数收敛回 home（τ≈100ms，约 360ms 视觉归位）。 */
+function tickPetOffset(dt: number): void {
+  if (state.petDragging) return;
+  const o = state.petOffset;
+  if (o.x === 0 && o.y === 0) return;
+  const k = 1 - Math.exp(-dt / 100);
+  o.x += -o.x * k;
+  o.y += -o.y * k;
+  if (Math.abs(o.x) < 0.5) o.x = 0;
+  if (Math.abs(o.y) < 0.5) o.y = 0;
+}
+
 let lastTs = 0;
 function loop(ts: number): void {
   if (lastTs === 0) lastTs = ts;
@@ -968,6 +1064,7 @@ function loop(ts: number): void {
   lastTs = ts;
   hits = [];
   pet.tick(dt);
+  tickPetOffset(dt);
   streamTick(dt);
   updatePet();
   tickTips();
@@ -992,6 +1089,8 @@ const api: AppApi = {
   get _hits(): Hit[] { return hits; },
   dateLabel,
   allSessionIds,
+  companionPetRect: () => UI.companionPetRect(),
+  companionLimits: () => UI.companionLimits(),
   reportCaret(col: number, row: number): void { caretCell = { col, row }; },
   skins: SKINS,
   skinMeta,
@@ -1015,8 +1114,8 @@ export function start(canvas: HTMLCanvasElement): void {
   TUI.Input.keyUp = null;
   TUI.Input.down = onDown;
   TUI.Input.move = onMove;
-  TUI.Input.up = null;
-  TUI.Input.leave = null;
+  TUI.Input.up = onUp;
+  TUI.Input.leave = onLeave;
   TUI.Input.wheel = onWheel;
   window.addEventListener('focus', focusIme);
   document.addEventListener('mousedown', (e: MouseEvent) => {
