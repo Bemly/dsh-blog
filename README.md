@@ -196,4 +196,4 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 
 ## License
 
-[Net-SNMP](https://spdx.org/licenses/Net-SNMP.html)（SPDX: `Net-SNMP`），全文见 [LICENSE](LICENSE)。
+[BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html)（SPDX: `BSD-3-Clause`），全文见 [LICENSE](LICENSE)。
