@@ -8,10 +8,12 @@
  * 布局：cols = ceil(sqrt(n))、rows = ceil(n/cols)，行优先；空位填透明。
  * 编码：avifenc -q 60 --qalpha <QA> -s 0（最高压缩档）。
  *
+ * 逐帧源图不入库，只提交生成结果；重新生成时把素材包路径传进来。
  * 依赖：ffmpeg、avifenc（brew install ffmpeg libavif）
  * 用法：
- *   bun run encode:sheet                                  # 默认：whalegirl ← assets/whalegirl
- *   bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]  # 例如 whale-maid <dir> 1 85
+ *   bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
+ *   bun run encode:sheet whalegirl <kit>/whaleGirl/img
+ *   bun run encode:sheet whale-maid-anime <kit>/whale-maid-anime-video/img 0.75 85
  */
 import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -82,8 +84,8 @@ function encode(skin: string, src: string, scale: number, qalpha: string): void 
 }
 
 const args = process.argv.slice(2);
-if (args.length >= 2) {
-  encode(args[0]!, resolve(args[1]!), Number(args[2] ?? '1'), args[3] ?? '60');
-} else {
-  encode('whalegirl', join(ROOT, 'assets/whalegirl'), 1, '60');
+if (args.length < 2) {
+  console.error('用法: bun run encode:sheet <skin> <源目录> [缩放=1] [alphaQ=60]');
+  process.exit(1);
 }
+encode(args[0]!, resolve(args[1]!), Number(args[2] ?? '1'), args[3] ?? '60');

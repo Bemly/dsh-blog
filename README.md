@@ -54,7 +54,6 @@ src/
     girls.ts            30×30 静态真彩精灵（claude / whale-girl）
     timings.ts          三个角色的逐帧时长表（ms）
 assets/
-  whalegirl/            鲸娘「原生像素帧」源素材：<动画>/<NN>.webp（267 帧）
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
   claude-girl-sheet/    Claude 娘 AVIF 精灵图（22 张 / 225 帧）
   codex-girl-sheet/     Codex 娘 AVIF 精灵图（22 张 / 225 帧）
@@ -115,13 +114,14 @@ assets/
 改素材后重新生成精灵图（需要 `ffmpeg` 和 `avifenc`，`brew install ffmpeg libavif`）：
 
 ```bash
-bun run encode:sheet                                   # 默认：assets/whalegirl/ → assets/whalegirl-sheet/
-bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]   # 例：whale-maid-anime <dir> 0.75 85
+bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
+# 例：bun run encode:sheet whalegirl <素材包>/whaleGirl/img
+#     bun run encode:sheet whale-maid-anime <素材包>/whale-maid-anime-video/img 0.75 85
 ```
 
-> Claude 娘 / Codex 娘的逐帧源图（各 225 张 PNG，约 15MB）没有入库，放在素材包目录里；
-> 只有生成好的精灵图进仓库。鲸娘的逐帧 WebP 因为最初就是这么搬进来的，留在
-> `assets/whalegirl/` 当源。
+> **逐帧源图一律不入库**，只提交生成好的精灵图。重新生成时需要素材包里的原始帧
+> （鲸娘 `<kit>/whaleGirl/img`、Claude 娘 `<kit>/claude-girl/img`、
+> Codex 娘 `<kit>/codex-girl/img`、女仆 `<kit>/whale-maid-*/img`）。
 
 启动页交互也与原版 `SplashMascot` 同一条语义：
 
