@@ -257,6 +257,8 @@ export interface Pet {
 export interface PetKitApi {
   create(skin: SkinId): Pet;
   preview(skin: SkinId, layer: PixelLayerApi, x: number, y: number, w: number, h: number): void;
+  /** 预览里点一下：随机换一个动作（与主宠物同一套点击逻辑）。 */
+  previewClick(skin: SkinId, fracX: number): void;
   warm(skin: SkinId): void;
   readonly PORTRAITS: Record<string, PortraitArt>;
   readonly MOOD_ANIM: Record<string, string>;
@@ -420,6 +422,10 @@ export interface AppState {
   panelCols: number;
   /** 指针停在侧栏边界把手上（高亮）。 */
   panelResizeHover: boolean;
+  /** 当前悬停的命中区 id（设置页 / 形象选择器做行高亮）。 */
+  hoverId: string | null;
+  /** 形象选择器里悬停的条目下标（-1 = 没有悬停，预览回落到选中项）。 */
+  skinHover: number;
   panelTabs: PanelTab[];
   panelTab: string;
   panelData: PanelData;

@@ -96,6 +96,8 @@ const state: AppState = {
   panelOpen: true,
   panelCols: 0,
   panelResizeHover: false,
+  hoverId: null,
+  skinHover: -1,
   panelTabs: [
     { id: 'companion', label: '♥' }, { id: 'todos', label: '✓' }, { id: 'jobs', label: '⚙' },
     { id: 'context', label: '◫' }, { id: 'tips', label: '?' }, { id: 'themes', label: '◐' },
@@ -478,6 +480,7 @@ function cycleSkin(): void {
 
 function openSkinPicker(): void {
   state.overlay = 'skin';
+  state.skinHover = -1;
   state.skinSel = Math.max(0, SKINS.findIndex(s => s.id === state.skin));
   const cur = SKINS[state.skinSel];
   if (cur !== undefined) PetKit.warm(cur.id);
@@ -591,6 +594,12 @@ function dispatch(action: string | null): void {
     case 'theme': cycleTheme(); break;
     case 'skin': cycleSkin(); break;
     case 'skin-picker': openSkinPicker(); break;
+    case 'skinpreview': {
+      const idx = state.skinHover >= 0 ? state.skinHover : state.skinSel;
+      const s = SKINS[idx];
+      if (s !== undefined) PetKit.previewClick(s.id, 0.5);
+      break;
+    }
     case 'model': cycleModel(); break;
     case 'tips': rotateTip(); break;
     case 'panel-close': state.panelOpen = false; break;
@@ -742,12 +751,14 @@ function onKey(e: KeyboardEvent): void {
   if (state.overlay === 'skin') {
     if (k === 'Escape') { state.overlay = null; e.preventDefault(); return; }
     if (k === 'ArrowUp') {
+      state.skinHover = -1;
       state.skinSel = Math.max(0, state.skinSel - 1);
       const s = SKINS[state.skinSel];
       if (s !== undefined) PetKit.warm(s.id);
       e.preventDefault(); return;
     }
     if (k === 'ArrowDown') {
+      state.skinHover = -1;
       state.skinSel = Math.min(SKINS.length - 1, state.skinSel + 1);
       const s = SKINS[state.skinSel];
       if (s !== undefined) PetKit.warm(s.id);
@@ -993,15 +1004,25 @@ function onMove(px: number, py: number): void {
   let ah: string | null = null;
   let overClickable = false;
   let overResize = false;
+  let hoverId: string | null = null;
   for (const h of hits) {
     if (cell.col >= h.x && cell.col < h.x + h.w && cell.row >= h.y && cell.row < h.y + h.h) {
       if (h.id.startsWith('param:')) ph = h.id.slice(6);
       if (h.id.startsWith('action:')) ah = h.id.slice(7);
       if (h.id === 'panelresize') overResize = true;
-      else if (h.action !== null) overClickable = true;
+      else if (h.action !== null) { overClickable = true; hoverId = h.id; }
     }
   }
   state.panelResizeHover = overResize && state.overlay === null;
+  state.hoverId = state.panelResizeHover ? null : hoverId;
+  if (hoverId !== null && hoverId.startsWith('skinsel:')) {
+    const idx = SKINS.findIndex(s => `skinsel:${s.id}` === hoverId);
+    if (idx >= 0 && idx !== state.skinHover) {
+      state.skinHover = idx;
+      const s = SKINS[idx];
+      if (s !== undefined) PetKit.warm(s.id);
+    }
+  }
   if (resizing) applyPanelResize(cell.col);
   state.paramHover = ph;
   state.actionHover = ah;
@@ -1029,6 +1050,7 @@ function onUp(_col: number, _row: number, _btn: number, e: MouseEvent): void {
 function onLeave(): void {
   state.petHover = false;
   state.panelResizeHover = false;
+  state.hoverId = null;
   resizing = false;
   if (dragBase !== null) {
     dragBase = null;

@@ -482,8 +482,9 @@ export class Player implements Pet {
   }
 }
 
-// 预览：给选择器画静态首帧/立绘（按 id 缓存播放器，不参与主循环）
+// 预览：选择器里的动态预览（按 id 缓存播放器，只用墙钟推进，不参与主循环）
 const previewPlayers: Record<string, Player> = Object.create(null) as Record<string, Player>;
+const previewClocks: Record<string, number> = Object.create(null) as Record<string, number>;
 
 function previewPlayer(skin: SkinId): Player {
   const cached = previewPlayers[skin];
@@ -493,14 +494,28 @@ function previewPlayer(skin: SkinId): Player {
   return p;
 }
 
+/** 预览推进：两次渲染间隔作为 dt（上限 64ms，防止切标签后跳帧）。 */
+function previewStep(p: Player, skin: SkinId): void {
+  const now = performance.now();
+  const last = previewClocks[skin];
+  const dt = last === undefined ? 16 : Math.min(64, Math.max(0, now - last));
+  previewClocks[skin] = now;
+  p.tick(dt);
+}
+
 export const PetKit: PetKitApi = {
   create(skin: SkinId): Pet {
     return new Player(skin);
   },
   preview(skin: SkinId, layer: PixelLayerApi, x: number, y: number, w: number, h: number): void {
     const p = previewPlayer(skin);
-    p.time = 0;
+    previewStep(p, skin);
     p.renderTo(layer, x, y, w, h);
+  },
+  previewClick(skin: SkinId, fracX: number): void {
+    const p = previewPlayer(skin);
+    p.click(fracX);
+    previewClocks[skin] = performance.now();
   },
   warm(skin: SkinId): void {
     if (PORTRAITS[skin] !== undefined) {

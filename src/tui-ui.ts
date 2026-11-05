@@ -105,8 +105,13 @@ function button(x: number, y: number, w: number, label: string, o?: ButtonOption
   const active = opts.active === true;
   const accent = opts.accent === true;
   const danger = opts.danger === true;
+  const hovered = App !== null && App.state.hoverId === (opts.id ?? label);
   const fg = danger ? '#0b0e16' : (accent ? '#0b0e16' : T().fg);
-  const bgc = danger ? T().red : (accent ? T().accent : (active ? T().accentDim : T().panel2));
+  const bgc = danger
+    ? T().red
+    : accent
+      ? (hovered ? T().accentShimmer : T().accent)
+      : (active ? T().accentDim : (hovered ? T().border : T().panel2));
   TUI.fill(x, y, w, 1, { bg: bgc });
   const lx = x + Math.max(1, Math.floor((w - W(label)) / 2));
   TUI.text(lx, y, label, fg, bgc, opts.st ?? (active ? ST.BOLD : 0));
@@ -1122,37 +1127,41 @@ function drawSettings(): void {
     TUI.text(x + 2, row, label, T().accentDim, undefined, ST.BOLD);
     row += 1;
   };
-  const setting = (label: string, render: (xx: number, yy: number) => void): void => {
-    TUI.text(x + 2, row, label, T().fg);
+  const hoverId = app.state.hoverId;
+  const setting = (label: string, ids: readonly string[], render: (xx: number, yy: number) => void): void => {
+    const hovered = hoverId !== null && ids.includes(hoverId);
+    const rowBg = hovered ? T().thinkBg : undefined;
+    if (rowBg !== undefined) TUI.fill(x + 1, row, bw - 2, 1, { bg: rowBg });
+    TUI.text(x + 2, row, label, T().fg, rowBg);
     render(ctrlX, row);
     row += 1;
   };
   section('界面');
-  setting('主题 theme', (xx, yy) => {
+  setting('主题 theme', ['theme-dark', 'theme-light'], (xx, yy) => {
     TUI.text(xx, yy, 'dark', app.state.theme === 'dark' ? T().accent : T().dim, undefined, app.state.theme === 'dark' ? ST.BOLD : 0);
     TUI.text(xx + 6, yy, 'light', app.state.theme === 'light' ? T().accent : T().dim, undefined, app.state.theme === 'light' ? ST.BOLD : 0);
     hit('theme-dark', xx, yy, 5, 1, 'theme-dark', 'dark');
     hit('theme-light', xx + 6, yy, 6, 1, 'theme-light', 'light');
   });
-  setting('宠物形象 skin', (xx, yy) => {
+  setting('宠物形象 skin', ['skin'], (xx, yy) => {
     const m = app.skinMeta(app.state.skin);
     TUI.text(xx, yy, m.label, T().accent);
     TUI.text(xx + W(m.label) + 2, yy, '选择 ▸', T().dim);
     hit('skin', xx, yy, 22, 1, 'skin-picker', 'skin');
   });
-  setting('流式输出 streaming', (xx, yy) => toggle(xx, yy, app.state.streamingEnabled, 'tog-streaming'));
-  setting('自动滚动 auto-scroll', (xx, yy) => toggle(xx, yy, app.state.autoScroll, 'tog-autoscroll'));
-  setting('光标闪烁 cursor blink', (xx, yy) => toggle(xx, yy, app.state.cursorBlink, 'tog-cursor'));
+  setting('流式输出 streaming', ['tog-streaming'], (xx, yy) => toggle(xx, yy, app.state.streamingEnabled, 'tog-streaming'));
+  setting('自动滚动 auto-scroll', ['tog-autoscroll'], (xx, yy) => toggle(xx, yy, app.state.autoScroll, 'tog-autoscroll'));
+  setting('光标闪烁 cursor blink', ['tog-cursor'], (xx, yy) => toggle(xx, yy, app.state.cursorBlink, 'tog-cursor'));
   row += 1;
   section('模型');
-  setting('默认模型 model', (xx, yy) => {
+  setting('默认模型 model', ['model'], (xx, yy) => {
     TUI.text(xx, yy, app.state.model, T().cyan);
     hit('model', xx, yy, 16, 1, 'model', 'model');
   });
-  setting('温度 temperature', (xx, yy) => slider(xx, yy, 20, app.state.temperature, 'slider-temp'));
+  setting('温度 temperature', ['slider-temp'], (xx, yy) => slider(xx, yy, 20, app.state.temperature, 'slider-temp'));
   row += 1;
   section('数据');
-  setting('清除全部会话 clear', (xx, yy) => {
+  setting('清除全部会话 clear', ['clear-sessions'], (xx, yy) => {
     TUI.text(xx, yy, '[ 执行 ]', T().red);
     hit('clear-sessions', xx, yy, 8, 1, 'clear-sessions', 'clear');
   });
@@ -1278,21 +1287,23 @@ function drawSkinPicker(): void {
   const skins = skinList();
   if (skins.length === 0) return;
   const sel = Math.max(0, Math.min(App.state.skinSel, skins.length - 1));
+  const shown = App.state.skinHover >= 0 ? Math.min(App.state.skinHover, skins.length - 1) : sel;
   let row = g.y + 2;
   for (let i = 0; i < skins.length; i++) {
     const sk = skins[i];
     if (sk === undefined) continue;
     const isSel = i === sel;
+    const isHover = i === shown && !isSel;
     const cur = sk.id === App.state.skin;
-    const bgc = isSel ? T().panel2 : '';
-    if (isSel) TUI.fill(g.x + 2, row, g.listW, 2, { bg: T().panel2 });
-    TUI.text(g.x + 3, row, clipLine(`${cur ? '● ' : '○ '}${sk.label}`, g.listW - 2), cur ? T().accent : (isSel ? T().suggestion : T().fg), bgc, cur || isSel ? ST.BOLD : 0);
+    const bgc = isSel ? T().panel2 : (isHover ? T().thinkBg : '');
+    if (isSel || isHover) TUI.fill(g.x + 2, row, g.listW, 2, { bg: bgc });
+    TUI.text(g.x + 3, row, clipLine(`${cur ? '● ' : '○ '}${sk.label}`, g.listW - 2), cur ? T().accent : (isSel || isHover ? T().suggestion : T().fg), bgc, cur || isSel ? ST.BOLD : 0);
     TUI.text(g.x + 3, row + 1, clipLine(`   ${sk.kind} · ${sk.desc}`, g.listW - 2), T().dim, bgc);
     hit(`skinsel:${sk.id}`, g.x + 2, row, g.listW, 2, `skinsel:${sk.id}`, sk.label);
     row += 2;
   }
   TUI.box(g.preview.x, g.preview.y, g.preview.w, g.preview.h, { fg: T().border });
-  const label = skins[sel]?.label ?? '';
+  const label = skins[shown]?.label ?? '';
   TUI.text(g.preview.x + 2, g.preview.y, ` ${label} `, T().dim, T().panel);
   TUI.text(g.x + 3, g.y + g.h - 2, '↑↓ 选择 · Enter 应用 · Esc 关闭', T().dim);
 }
@@ -1303,9 +1314,12 @@ function drawSkinPreview(): void {
   const skins = skinList();
   if (skins.length === 0) return;
   const sel = Math.max(0, Math.min(App.state.skinSel, skins.length - 1));
+  const shown = App.state.skinHover >= 0 ? Math.min(App.state.skinHover, skins.length - 1) : sel;
   const pv = g.preview;
+  // 动态预览：默认 idle，点一下随机换动作
+  hit('skinpreview', pv.x, pv.y, pv.w, pv.h, 'skinpreview', '预览');
   PetKit.preview(
-    skins[sel]?.id ?? '',
+    skins[shown]?.id ?? '',
     PixelLayer,
     (pv.x + 1) * TUI.cw, (pv.y + 1) * TUI.ch,
     (pv.w - 2) * TUI.cw, (pv.h - 2) * TUI.ch,
