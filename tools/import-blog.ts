@@ -60,6 +60,8 @@ function readPosts(): RawPost[] {
   return picked.map((file, index) => {
     const body = readFileSync(join(srcDir, file), 'utf8')
       .replace(/\r\n/g, '\n')
+      // 去掉 YAML frontmatter（Obsidian 的 AIGC 标签块）
+      .replace(/^---\n[\s\S]*?\n---\n/, '')
       // 去掉「内容由AI生成」的免责声明行
       .replace(/^.*内容由\s*AI\s*生成.*$\n?/gm, '');
     // 用整体序号做 id / 目录：源文件前缀会重复（002-01、002-02 都属于 002）

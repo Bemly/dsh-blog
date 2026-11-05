@@ -95,7 +95,8 @@ bun run import:blog <源目录> [限制篇数]     # 断点续传：已有 .avif
 - 图片统一 `avifenc -q 60 --qalpha 60 -s 0`；GIF / WebP / 伪扩展名先经 ffmpeg 转 PNG，
   PNG/JPEG 直接编码，失败再回退转码；
 - `posts.ts` 与 `assets/blog/` 都是生成物，**不要手改**，要改就改导入脚本再重跑；
-- 「内容由 AI 生成」的免责声明行在导入时剔除，别让它出现在正文里；
+- 导入时剔除 YAML frontmatter（`AIGC:` 标签块）和「内容由 AI 生成」免责声明行，
+  别让它们出现在正文里；
 - 消息里只画 `assets/` 下的图：跨域图会污染 canvas，导致整个像素层 `getImageData` 抛异常；
 - Markdown 解析结果按内容缓存（最近 6 条），正文解析不能每次绘制都重跑。
 

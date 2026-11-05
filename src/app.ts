@@ -290,7 +290,8 @@ function switchSession(id: string): void {
   state.session = s;
   state.lastSessionTitle = s.title;
   state.scroll = 0;
-  state.userScrolled = false;
+  // 文章会话从正文顶部开始读，不跟着聊天自动滚到底
+  state.userScrolled = id.startsWith('post-');
   state.streaming = false;
 }
 

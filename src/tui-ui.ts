@@ -544,14 +544,14 @@ function drawMessages(): void {
     const ln = lines[i];
     if (ln === undefined || ln.kind === 'gap') continue;
     const y = area.y + (i - scroll);
-    let out = ln;
     if (ln.kind === 'image') {
-      // 图片跨到输入框/页脚时按可见行裁剪
+      // 图片跨到输入框时按可见行**裁剪源图**，不能压缩目标高度（会压扁）
       const avail = area.y + area.h - y;
       if (avail <= 0) continue;
-      if (ln.rows > avail) out = { ...ln, rows: avail };
+      drawLine(area.x, y, area.w, ln, avail);
+      continue;
     }
-    drawLine(area.x, y, area.w, out);
+    drawLine(area.x, y, area.w, ln);
   }
   // 滚动条（原版 ScrollbarGutter）
   if (maxScroll > 0) {
@@ -564,7 +564,7 @@ function drawMessages(): void {
   }
 }
 
-function drawLine(x: number, y: number, w: number, ln: Line): void {
+function drawLine(x: number, y: number, w: number, ln: Line, clipRows?: number): void {
   switch (ln.kind) {
     case 'text':
     case 'user':
@@ -621,11 +621,16 @@ function drawLine(x: number, y: number, w: number, ln: Line): void {
       TUI.text(x, y, clipLine(ln.text, w), T().dim);
       break;
     case 'image': {
+      const rows = clipRows === undefined ? ln.rows : Math.max(1, Math.min(ln.rows, clipRows));
       const img = postImage(ln.src);
       if (img !== null) {
-        PixelLayer.imageSmooth(img, (x + 1) * TUI.cw, y * TUI.ch, ln.cols * TUI.cw, ln.rows * TUI.ch);
+        const nh = img.naturalHeight || 1;
+        const sh = Math.max(1, Math.round(nh * rows / Math.max(1, ln.rows)));
+        // 裁源图顶部、目标框等比缩短，保持宽高比
+        PixelLayer.imageSubSmooth(img, 0, 0, img.naturalWidth, sh,
+          (x + 1) * TUI.cw, y * TUI.ch, ln.cols * TUI.cw, rows * TUI.ch);
       } else {
-        TUI.fill(x + 1, y, ln.cols, ln.rows, { bg: T().panel2 });
+        TUI.fill(x + 1, y, ln.cols, rows, { bg: T().panel2 });
         TUI.text(x + 3, y + 1, clipLine(`🖼 ${ln.alt || ln.src}`, ln.cols - 4), T().dim, T().panel2);
       }
       break;

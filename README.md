@@ -164,7 +164,7 @@ Markdown 逐块渲染，配图就地铺在消息流里。
 - 入口：`⌘J` 继续最近，或 `⌘K` →「会话与工作区」/ 启动页「会话与工作区」；
 - 会话列表支持 `↑↓ / j k`、`PageUp/PageDown`、`Home/End`、鼠标滚轮，选中 `Enter` 打开；
 - 正文首行重复的 `# 标题` 在灌入时去掉，避免和顶栏重复；
-- 图片按消息区宽度铺满、最高 40 行，滚动时按行裁剪；外链图（http/https）降级成
+- 图片按消息区宽度铺满、最高 40 行；滚到视口边缘时按行**裁源图**（不会压扁）；外链图（http/https）降级成
   `🖼 alt` 文字——跨域图会污染 canvas，之后所有 `getImageData` 都会抛 SecurityError；
 - Markdown 解析结果按内容缓存（最近 6 条），图片懒加载后请求重绘。
 
@@ -175,8 +175,9 @@ bun run import:blog <源目录> [限制篇数]     # 图片统一 AVIF q60 · -s
 ```
 
 图片输出到 `assets/blog/<序号>/iNN-<原名>.avif`，正文引用同步改写；GIF / WebP /
-伪扩展名（.png 实为 ico、.jpg 实为 webp）会先用 ffmpeg 转 PNG 再编码；「内容由 AI
-生成」的免责声明行在导入时剔除。已有输出会跳过，中断后重跑可续传。
+伪扩展名（.png 实为 ico、.jpg 实为 webp）会先用 ffmpeg 转 PNG 再编码；YAML frontmatter
+（Obsidian 的 `AIGC:` 标签块）与「内容由 AI 生成」的免责声明行都在导入时剔除。
+已有输出会跳过，中断后重跑可续传。
 
 ## 交互
 ## 交互
