@@ -52,15 +52,25 @@ interface LaunchGeom {
 }
 
 // ── 布局 ───────────────────────────────────────────────────
+const MIN_PANEL_COLS = 22;
+const MAX_PANEL_COLS = 84;
+
+/** 侧栏宽度：用户拖过就用 panelCols，否则按窗口宽度自适应。 */
+function panelWidth(): number {
+  const COLS = TUI.COLS;
+  if (App === null || !App.state.panelOpen || COLS < 92) return 0;
+  const auto = Math.min(44, Math.max(30, Math.floor(COLS * 0.26)));
+  const want = App.state.panelCols > 0 ? App.state.panelCols : auto;
+  return Math.max(MIN_PANEL_COLS, Math.min(MAX_PANEL_COLS, COLS - 50, want));
+}
+
 function layout(): Layout {
   const COLS = TUI.COLS;
   const ROWS = TUI.ROWS;
   const headH = 1;
   const statusH = 1;
   const composerH = 3;
-  const panelW = App !== null && App.state.panelOpen && COLS >= 92
-    ? Math.min(44, Math.max(30, Math.floor(COLS * 0.26)))
-    : 0;
+  const panelW = panelWidth();
   const mainW = COLS - panelW;
   const bodyY = headH;
   const bodyH = Math.max(4, ROWS - headH - composerH - statusH);
@@ -299,6 +309,10 @@ function drawPanel(): void {
   const P = L.panel;
   TUI.fill(P.x, P.y, P.w, P.h, { bg: T().panel });
   TUI.vline(P.x, P.y, P.h, T().border, T().panel);
+  hit('panelresize', P.x, P.y, 1, P.h, 'panelresize', '拖动调整侧栏');
+  // 拖拽把手：边界中段画三格短竖线，提示可以左右拖
+  const gripY = P.y + Math.floor(P.h / 2) - 1;
+  for (let i = 0; i < 3; i++) TUI.put(P.x, gripY + i, '┆', T().accentDim, T().panel);
   const tabs = App.state.panelTabs;
   let x = P.x + 1;
   const tabW = Math.floor((P.w - 2) / tabs.length);

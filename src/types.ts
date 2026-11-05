@@ -416,6 +416,8 @@ export interface AppState {
   budget: number;
   web: boolean;
   panelOpen: boolean;
+  /** 侧栏宽度（字符列）；0 = 按窗口宽度自适应。 */
+  panelCols: number;
   panelTabs: PanelTab[];
   panelTab: string;
   panelData: PanelData;

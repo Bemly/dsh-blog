@@ -94,6 +94,7 @@ const state: AppState = {
   temperature: 0.7, topP: 0.9, maxTokens: 8192, budget: 10, web: false,
 
   panelOpen: true,
+  panelCols: 0,
   panelTabs: [
     { id: 'companion', label: '♥' }, { id: 'todos', label: '✓' }, { id: 'jobs', label: '⚙' },
     { id: 'context', label: '◫' }, { id: 'tips', label: '?' }, { id: 'themes', label: '◐' },
@@ -919,6 +920,19 @@ function sendInput(): void {
 // ── 输入：鼠标 / 滚轮 ──────────────────────────────────────
 interface DragBase { px: number; py: number; x: number; y: number }
 let dragBase: DragBase | null = null;
+/** 侧栏边界拖拽中。 */
+let resizing = false;
+
+/** 侧栏调宽：边界跟手（col = 指针所在字符列，面板贴右）。 */
+function applyPanelResize(col: number): void {
+  const min = 22;
+  const max = Math.max(min, Math.min(84, TUI.COLS - 50));
+  state.panelCols = Math.max(min, Math.min(max, TUI.COLS - col));
+}
+
+function savePanelCols(): void {
+  try { localStorage.setItem('dsh-tui.panelCols', String(state.panelCols)); } catch { /* 忽略 */ }
+}
 
 /** 侧栏宠物：按住 → 拖拽跟手（clamp 在面板内）；松手 → 交给帧循环弹回。 */
 function startPetDrag(e: MouseEvent): void {
@@ -962,6 +976,7 @@ function onDown(col: number, row: number, _btn: number, e: MouseEvent): void {
     if (h === undefined) continue;
     if (col >= h.x && col < h.x + h.w && row >= h.y && row < h.y + h.h) {
       if (h.action !== null && h.action.startsWith('petside:')) { startPetDrag(e); return; }
+      if (h.action === 'panelresize' && state.overlay === null) { resizing = true; applyPanelResize(col); return; }
       dispatch(h.action);
       return;
     }
@@ -975,13 +990,16 @@ function onMove(px: number, py: number): void {
   let ph: string | null = null;
   let ah: string | null = null;
   let overHit = false;
+  let overResize = false;
   for (const h of hits) {
     if (cell.col >= h.x && cell.col < h.x + h.w && cell.row >= h.y && cell.row < h.y + h.h) {
       if (h.id.startsWith('param:')) ph = h.id.slice(6);
       if (h.id.startsWith('action:')) ah = h.id.slice(7);
+      if (h.id === 'panelresize') overResize = true;
       overHit = true;
     }
   }
+  if (resizing) applyPanelResize(cell.col);
   state.paramHover = ph;
   state.actionHover = ah;
   state.petHover = petHoverAt(px, py);
@@ -994,15 +1012,20 @@ function onMove(px: number, py: number): void {
     lastActivity = now();
   }
   const grab = dragBase !== null;
-  document.body.style.cursor = grab ? 'grabbing' : (state.petHover ? 'grab' : (overHit ? 'pointer' : 'text'));
+  const resizeCursor = resizing || (overResize && state.overlay === null);
+  document.body.style.cursor = resizeCursor
+    ? 'col-resize'
+    : (grab ? 'grabbing' : (state.petHover ? 'grab' : (overHit ? 'pointer' : 'text')));
 }
 
 function onUp(_col: number, _row: number, _btn: number, e: MouseEvent): void {
+  if (resizing) { resizing = false; savePanelCols(); return; }
   endPetDrag(e, true);
 }
 
 function onLeave(): void {
   state.petHover = false;
+  resizing = false;
   if (dragBase !== null) {
     dragBase = null;
     state.petDragging = false;
@@ -1106,6 +1129,8 @@ export function start(canvas: HTMLCanvasElement): void {
   try {
     const saved = localStorage.getItem('dsh-tui.skin');
     if (saved !== null && SKINS.some(s => s.id === saved)) state.skin = saved;
+    const cols = Number(localStorage.getItem('dsh-tui.panelCols'));
+    if (Number.isFinite(cols) && cols >= 22 && cols <= 200) state.panelCols = Math.round(cols);
   } catch { /* 忽略 */ }
   pet = PetKit.create(state.skin);
   PetKit.warm(state.skin);

@@ -167,7 +167,8 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 | `⌘K` → 形象 | 宠物形象选择器（实时预览） |
 | `?` | 快捷键帮助（NORMAL 模式） |
 | `F11` | 全屏 |
-| 点击宠物 | poke / tickle / happy |
+| 点击宠物 | 随机动作 / tickle / happy |
+| 拖动侧栏左边界 | 调整侧栏宽度（22–84 列，记入 localStorage） |
 
 中文输入走隐藏 `<textarea>`（IME 组合事件 + 粘贴），画布光标位置同步给输入法。
 
