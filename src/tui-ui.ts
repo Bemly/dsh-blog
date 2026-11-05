@@ -389,7 +389,9 @@ function drawCompanion(panel: Rect): void {
   TUI.text(x + 2, panel.y + 2, clipLine(MOOD_LABEL[mood] ?? '发呆', w - 2), T().fg, T().panel);
   const phrase = companionPhrase(mood);
   if (phrase !== '') TUI.text(x, panel.y + 3, clipLine(`⏵ ${phrase}`, w), T().dim, T().panel);
-  TUI.text(x, panel.y + 4, clipLine(`当前动作：${meta.label}`, w), T().dim, T().panel);
+  const animKey = App.pet === null ? '' : App.pet.currentAnim();
+  const animLabel = PetKit.ANIM_LABEL[animKey] ?? meta.label;
+  TUI.text(x, panel.y + 4, clipLine(`当前动作：${animLabel}`, w), T().dim, T().panel);
   TUI.text(x, panel.y + 5, clipLine('点它戳一戳 · 连点挠痒痒 · 拖拽拎起来', w), T().dim, T().panel);
 
   const cw = TUI.cw;

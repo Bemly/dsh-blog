@@ -69,7 +69,7 @@ const TIPS: readonly string[] = [
   '第一次用 dsh-TUI？花一分钟跑一遍引导，把 API Key、语言、主题、模型一次配好。',
   'Tab 切换 NORMAL / INSERT，Esc 关闭弹层，⌘K 打开命令菜单。',
   '⌘B 切换右侧面板，⌘T / ⌘R / ⌘E 直接打开 Todos / Jobs / 上下文。',
-  '点击启动页的鲸娘：左/右半是 poke，连点三下会 tickle。',
+  '点一下宠物随机换一个动作，连点三下会 tickle。',
   '输入 / 开头可以看命令提示；Shift+Enter 换行由浏览器保留。',
 ];
 

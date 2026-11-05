@@ -12,11 +12,11 @@
    - deepy       : 42×30 字符动画 ×20
    - whale       : 开屏鲸鱼 40×25 ×22 帧
 
-   启动页交互（与 dsh-TUI SplashMascot 同一条语义）：
+   交互（启动页 / 侧栏共用）：
    - 稳态 idle 循环；
-   - 点击左/右半 → poke-left / poke-right（1.4s）；
-   - 鲸娘 poke 之后接 smile-hearts（2.4s）；
+   - 点击 → 从该形象全部动画（约 20 个）里随机挑一个完整播一轮；
    - 900ms 内连点 ≥3 次 → tickle；
+   - 开屏鲸鱼只有帧序列，回落到左/右 poke；
    - 高清立绘点击 → happy 变体 3s。
    ═══════════════════════════════════════════════════════════ */
 import type {
@@ -59,11 +59,25 @@ const MOOD_ANIM: Record<string, string> = {
 };
 const INTERACT_ANIMS: readonly string[] = ['poke-left', 'poke-right', 'tickle', 'drag', 'happy', 'music', 'conducting', 'swim'];
 
+/** 动画 key → 中文动作名（侧栏「当前动作」用；缺项回落到形象名）。 */
+const ANIM_LABEL: Record<string, string> = {
+  idle: '发呆', 'idle-look': '张望', 'idle-spout': '喷水', thinking: '思考',
+  typing: '打字', music: '听歌', conducting: '指挥', building: '搭建',
+  error: '出错', happy: '开心', notification: '提醒', compacting: '压缩',
+  carrying: '搬箱子', sleeping: '睡觉', waking: '醒来', 'poke-left': '戳左边',
+  'poke-right': '戳右边', tickle: '挠痒痒', drag: '被拎起来', swim: '游泳',
+  'smile-hearts': '爱心', 'thumbs-up': '点赞',
+};
+
 // 原版启动页常量（dsh-TUI SplashMascot / mood.ts）
 const SPLASH_POKE_MS = 1400;
-const SPLASH_HEART_MS = 2400;
 const TICKLE_WINDOW_MS = 900;
 const TICKLE_MIN_CLICKS = 3;
+/** 点击反应池的排除项：静止态与拖拽姿态（拖拽由 hold 控制）。 */
+const CLICK_EXCLUDE: ReadonlySet<string> = new Set(['idle', 'drag']);
+/** 单次随机动作的展示时长上下限（ms）。 */
+const REACTION_MIN_MS = 900;
+const REACTION_MAX_MS = 5000;
 /** 点立绘换 happy 变体的时长（原版 LogoV2 MAID_HAPPY_MS）。 */
 const HAPPY_MS = 3000;
 
@@ -195,7 +209,6 @@ export class Player implements Pet {
   animStart = 0;
   private anims: Record<string, AnimBankEntry> = {};
   private override: Override | null = null;
-  private heartAfter = false;
   private happyUntil = 0;
   private clicks: number[] = [];
   private portraitKey = '';
@@ -247,7 +260,11 @@ export class Player implements Pet {
     }
   }
 
-  /** 原版启动页点击：左/右半 poke、连点 tickle、鲸娘 poke 后接爱心；立绘换 happy。 */
+  /**
+   * 点击反应：从当前素材的全部动画里随机挑一个完整播一轮（20 个左右），
+   * 900ms 内连点 ≥3 次仍保留 tickle；立绘走 happy 变体；
+   * 只有帧序列的开屏鲸鱼没有动画表，回落到左/右 poke。
+   */
   click(fracX: number): void {
     if (this.pack.type === 'portrait') {
       this.happyUntil = this.time + HAPPY_MS;
@@ -262,22 +279,41 @@ export class Player implements Pet {
     if (rapid) this.clicks = [];
     if (rapid) {
       this.override = { key: 'tickle', start: t, until: t + TICKLE_WINDOW_MS };
-      this.heartAfter = false;
     } else {
-      this.override = { key: fracX < 0.5 ? 'poke-left' : 'poke-right', start: t, until: t + SPLASH_POKE_MS };
-      this.heartAfter = this.skin === 'whalegirl';
+      const pool = this.reactionPool();
+      if (pool.length === 0) {
+        this.override = { key: fracX < 0.5 ? 'poke-left' : 'poke-right', start: t, until: t + SPLASH_POKE_MS };
+      } else {
+        const key = pool[Math.floor(Math.random() * pool.length)] ?? 'idle';
+        const dur = Math.max(REACTION_MIN_MS, Math.min(REACTION_MAX_MS, this.keyDuration(key)));
+        this.override = { key, start: t, until: t + dur };
+      }
     }
-    if (this.sheet !== null && this.override !== null) {
-      imageAnim(this.sheet, this.override.key);
-      if (this.heartAfter) imageAnim(this.sheet, 'smile-hearts');
+    if (this.sheet !== null && this.override !== null) imageAnim(this.sheet, this.override.key);
+  }
+
+  /** 可随机触发的动作：去掉静止 idle 与拖拽 drag。 */
+  private reactionPool(): string[] {
+    const src = this.sheet !== null
+      ? Object.keys(this.sheet.timings)
+      : (this.pack.type === 'anim' ? Object.keys(this.anims) : []);
+    return src.filter(k => !CLICK_EXCLUDE.has(k));
+  }
+
+  /** 一个动作完整播一轮的时长（ms）。 */
+  private keyDuration(key: string): number {
+    if (this.sheet !== null) {
+      const durs = this.sheet.timings[key];
+      if (durs !== undefined) return durs.reduce((s, d) => s + d, 0);
     }
+    const a = this.anims[key];
+    return a === undefined ? 0 : a.total;
   }
 
   /** 侧栏拖拽：按住期间覆盖 `drag` 姿态，松手清掉覆盖。 */
   hold(on: boolean): void {
     if (on) {
       this.override = { key: 'drag', start: this.time, until: Number.POSITIVE_INFINITY };
-      this.heartAfter = false;
       if (this.sheet !== null) imageAnim(this.sheet, 'drag');
       return;
     }
@@ -290,12 +326,12 @@ export class Player implements Pet {
 
   tick(dt: number): void {
     this.time += dt;
-    if (this.override !== null && this.time >= this.override.until) {
-      const heart = this.heartAfter;
-      this.override = null;
-      this.heartAfter = false;
-      if (heart) this.override = { key: 'smile-hearts', start: this.time, until: this.time + SPLASH_HEART_MS };
-    }
+    if (this.override !== null && this.time >= this.override.until) this.override = null;
+  }
+
+  /** 当前正在播的动作 key（覆盖层优先）。 */
+  currentAnim(): string {
+    return this.currentKey();
   }
 
   private currentKey(): string {
@@ -477,6 +513,7 @@ export const PetKit: PetKitApi = {
   PORTRAITS,
   MOOD_ANIM,
   INTERACT_ANIMS,
+  ANIM_LABEL,
 };
 
 /** 供测试/调试：当前缓存的原生帧动画 key。 */

@@ -243,6 +243,8 @@ export interface Pet {
   tick(dt: number): void;
   setMood(mood: string): void;
   click(fracX: number): void;
+  /** 当前正在播的动作 key（侧栏「当前动作」显示用）。 */
+  currentAnim(): string;
   /** 侧栏拖拽：按住时切 `drag` 姿态，松手恢复。 */
   hold(on: boolean): void;
   interact(): void;
@@ -259,6 +261,8 @@ export interface PetKitApi {
   readonly PORTRAITS: Record<string, PortraitArt>;
   readonly MOOD_ANIM: Record<string, string>;
   readonly INTERACT_ANIMS: readonly string[];
+  /** 动画 key → 中文动作名。 */
+  readonly ANIM_LABEL: Record<string, string>;
 }
 
 // ── Markdown ───────────────────────────────────────────────

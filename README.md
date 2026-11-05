@@ -130,9 +130,10 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 启动页交互也与原版 `SplashMascot` 同一条语义：
 
 - 稳态 `idle` 循环；
-- 点击左/右半 → `poke-left` / `poke-right`（1.4s）；
-- 鲸娘 poke 之后接 `smile-hearts`（2.4s）；
-- 900ms 内连点 ≥3 次 → `tickle`。
+- 点击 → 从该形象全部动画（22 个里除 `idle` / `drag` 的 20 个）随机挑一个完整播一轮，
+  时长取该动画一轮的总时长（夹在 0.9–5s）；
+- 900ms 内连点 ≥3 次 → `tickle`；
+- 开屏鲸鱼只有帧序列，没有动画表，回落到左/右 `poke`。
 
 ## 侧栏伙伴（⌘B）
 
@@ -141,7 +142,7 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 
 - 心情由 `app.ts` 的 `updatePet()` 写入 `state.petMood`（睡觉 / 发呆 / 思考中 / 工作中 /
   完成啦 / 需要你 / 出错了），面板据此换色与文案；
-- 点左半 / 右半 → `poke-left` / `poke-right`；900ms 内连点 ≥3 次 → `tickle`；
+- 点击 → 随机挑一个动作完整播一轮（同启动页）；900ms 内连点 ≥3 次 → `tickle`；
 - 悬停 → `idle-look`；流式回合结束 → `happy`（2.5s 庆祝）；
 - 按住拖动可把宠物拎起来（`drag` 姿态，跟手且不出面板），松手按指数插值回 home（τ≈100ms）。
 
