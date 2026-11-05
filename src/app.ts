@@ -54,10 +54,10 @@ const PERMS: readonly string[] = ['工作区读写', '只读', '沙箱'];
 
 // 形象名册（与 dsh-TUI 的角色资产一一对应）
 const SKINS: SkinDef[] = [
-  { id: 'whalegirl', label: '鲸娘 · 动画', kind: '原生像素帧', desc: '22 个动画 / 267 帧 · 原版 kitty 图轨素材' },
+  { id: 'whalegirl', label: '鲸娘 · 动画', kind: '原生像素帧', desc: '22 个动画 / 267 帧 · AVIF 精灵图' },
+  { id: 'claude-girl', label: 'Claude 娘', kind: '原生像素帧', desc: '22 个动画 / 225 帧 · AVIF 精灵图' },
+  { id: 'codex-girl', label: 'Codex 娘', kind: '原生像素帧', desc: '22 个动画 / 225 帧 · AVIF 精灵图' },
   { id: 'maid-girl', label: '鲸娘 · 女仆', kind: '高清立绘', desc: '464×464 · 点击换「开心」变体' },
-  { id: 'claude-girl', label: 'Claude 娘', kind: '高清立绘', desc: '1024×1024 · claude 品牌形象' },
-  { id: 'codex-girl', label: 'Codex 娘', kind: '高清立绘', desc: '628×628 · 淡紫恶魔精灵' },
   { id: 'deepy', label: 'deepy', kind: '字符动画', desc: '42×30 · 20 个动画' },
   { id: 'whale', label: '小鲸鱼', kind: '字符动画', desc: '40×25 · 22 帧开屏鲸鱼' },
 ];

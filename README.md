@@ -52,11 +52,13 @@ src/
     deepy.ts            deepy 42×30 动画
     whale.ts            开屏鲸鱼 40×25 帧
     girls.ts            30×30 静态真彩精灵（claude / whale-girl）
-    timings.ts          鲸娘原生像素帧时间表
+    timings.ts          三个角色的逐帧时长表（ms）
 assets/
   whalegirl/            鲸娘「原生像素帧」源素材：<动画>/<NN>.webp（267 帧）
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
-  portraits/            高清立绘：claude-girl / codex-girl / whale-girl（normal + happy）
+  claude-girl-sheet/    Claude 娘 AVIF 精灵图（22 张 / 225 帧）
+  codex-girl-sheet/     Codex 娘 AVIF 精灵图（22 张 / 225 帧）
+  portraits/            高清立绘：whale-girl（女仆鲸娘，normal + happy）
 ```
 
 ## 角色形象（原版搬运，可在设置里选）
@@ -66,9 +68,9 @@ assets/
 | id | 名称 | 形态 | 素材 |
 |---|---|---|---|
 | `whalegirl` | 鲸娘 · 动画 | 原生像素帧 22 动画 / 267 帧（AVIF 精灵图） | `assets/whalegirl-sheet/` |
-| `maid-girl` | 鲸娘 · 女仆 | 高清立绘 464×464（+ happy） | `assets/portraits/whale-girl/` |
-| `claude-girl` | Claude 娘 | 高清立绘 1024×1024（+ happy） | `assets/portraits/claude-girl/` |
-| `codex-girl` | Codex 娘 | 高清立绘 628×628（+ happy） | `assets/portraits/codex-girl/` |
+| `claude-girl` | Claude 娘 | 原生像素帧 22 动画 / 225 帧（AVIF 精灵图） | `assets/claude-girl-sheet/` |
+| `codex-girl` | Codex 娘 | 原生像素帧 22 动画 / 225 帧（AVIF 精灵图） | `assets/codex-girl-sheet/` |
+| `maid-girl` | 鲸娘 · 女仆 | 高清立绘 464×464（+ happy，没有动画帧） | `assets/portraits/whale-girl/` |
 | `deepy` | deepy | 42×30 字符动画 ×20 | `src/data/deepy.ts` |
 | `whale` | 小鲸鱼 | 40×25 字符帧 ×22 | `src/data/whale.ts` |
 
@@ -79,28 +81,38 @@ assets/
 - 原生像素帧与字符动画走「真像素」路径，立绘走高质量缩放的 `imageSmooth`
   （真图不是整数倍像素网格，强制最近邻会锯齿）。
 
-## 鲸娘素材（原版搬运 + 精灵图）
+## 像素帧素材（精灵图）
 
-`assets/whalegirl/` 来自 dsh-TUI 的 `assets/whaleGirl/img/`
-（由用户提供的鲸娘 GIF 转出的原生像素帧，288px 高、保留真实 alpha）：
+三个形象共用同一套 301×288 原生像素帧（288px 高、保留真实 alpha），
+分别来自 dsh-TUI / 表情包素材包：
 
-- 22 个动画、267 帧全部搬运，无损转成 WebP（12MB → 6.9MB）；
-- 运行时用的是 `assets/whalegirl-sheet/<key>.avif`：**一个动画一张 AVIF 精灵图**，
-  由 `tools/encode-sheet.ts` 从上面的逐帧 WebP 生成（`ffmpeg` 拼 `tile` +
-  `avifenc -q 60 --qalpha 60 -s 0`）；
-- 267 个请求 / 6.9MB → **22 个请求 / 1.3MB**，实测 PSNR 40.05 dB、SSIM 0.994
-  （合成到 `#2A2F34` 背景后与无损源比对）；
+| 形象 | 帧数 | 精灵图体积 |
+|---|---|---|
+| 鲸娘 | 267 | 1.3 MB |
+| Claude 娘 | 225 | 2.3 MB |
+| Codex 娘 | 225 | 2.1 MB |
+
+- 运行时用的是 `assets/<skin>-sheet/<key>.avif`：**一个动画一张 AVIF 精灵图**，
+  由 `tools/encode-sheet.ts` 生成（`ffmpeg` 拼 `tile` + `avifenc -q 60 --qalpha 60 -s 0`）；
+- 逐帧散图 → **22 个请求**，鲸娘从 267 个请求 / 6.9MB 降到 22 个 / 1.3MB，
+  实测 PSNR 40.05 dB、SSIM 0.994（合成到 `#2A2F34` 背景后与无损源比对）；
 - 布局：单格 301×288，`cols = ceil(sqrt(n))`、`rows = ceil(n/cols)`，行优先，
-  空位透明；取帧仍是「时间 → 帧号 → 格号」，逐帧时长表 `src/data/timings.ts`
-  沿用原 `timings.json` 的 `dur`，所以打断/重播语义与逐帧版完全一致；
-- 首屏只预载 `idle`，其余动画按需懒加载；加载完成前回落到 42×30 字符格帧包
-  （`src/data/whalegirl.ts`），与原版「无图像协议 → 字母格」的回退路径一致。
+  空位透明；取帧仍是「时间 → 帧号 → 格号」，逐帧时长表在 `src/data/timings.ts`
+  （源各角色 `timings.json` 的 `dur`），所以打断/重播语义与逐帧版完全一致；
+- 首屏只预载 `idle`，其余动画按需懒加载；鲸娘加载完成前回落到 42×30 字符格帧包
+  （`src/data/whalegirl.ts`），与原版「无图像协议 → 字母格」的回退路径一致；
+- 女仆鲸娘没有动画帧，仍走 `imageSmooth` 的高清立绘路径。
 
 改素材后重新生成精灵图（需要 `ffmpeg` 和 `avifenc`，`brew install ffmpeg libavif`）：
 
 ```bash
-bun run encode:sheet   # assets/whalegirl/ → assets/whalegirl-sheet/
+bun run encode:sheet                                   # 默认：assets/whalegirl/ → assets/whalegirl-sheet/
+bun run encode:sheet claude-girl <源目录>              # 指定角色与源目录（PNG/WebP 均可）
 ```
+
+> Claude 娘 / Codex 娘的逐帧源图（各 225 张 PNG，约 15MB）没有入库，放在素材包目录里；
+> 只有生成好的精灵图进仓库。鲸娘的逐帧 WebP 因为最初就是这么搬进来的，留在
+> `assets/whalegirl/` 当源。
 
 启动页交互也与原版 `SplashMascot` 同一条语义：
 

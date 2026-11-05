@@ -41,14 +41,8 @@ export interface WhaleFrame {
   readonly rows: string[];
 }
 
-/** 原生像素帧的时间表条目。 */
-export interface ImageTiming {
-  readonly dur: number;
-  readonly file: string;
-}
-
-/** 动画 key → 帧时间表。 */
-export type ImageTimings = Record<string, ImageTiming[]>;
+/** 原生像素帧的时间表：动画 key → 每帧停留时长（ms）。 */
+export type ImageTimings = Record<string, readonly number[]>;
 
 // ── 主题 / 渲染单元 ────────────────────────────────────────
 /** 字符网格单元。 */
@@ -216,7 +210,15 @@ export interface PixelLayerApi {
 export type SkinId = string;
 
 /** 宠物包类型。 */
-export type PetPackKind = 'anim' | 'whalegirl' | 'whale' | 'rgb' | 'portrait' | 'none';
+export type PetPackKind = 'anim' | 'sheet' | 'whale' | 'rgb' | 'portrait' | 'none';
+
+/** 精灵图素材：目录 + 单格尺寸 + 逐帧时长表。 */
+export interface SheetArt {
+  /** 形如 `assets/claude-girl-sheet/`，运行时拼 `${dir}${key}.avif` */
+  readonly dir: string;
+  readonly cell: readonly [number, number];
+  readonly timings: ImageTimings;
+}
 
 /** 宠物当前加载的素材包。 */
 export interface PetPack {
@@ -227,6 +229,7 @@ export interface PetPack {
   readonly frames?: WhaleFrame[];
   readonly grid?: SpriteGrid;
   readonly art?: PortraitArt;
+  readonly sheet?: SheetArt;
 }
 
 /** 高清立绘资产。 */

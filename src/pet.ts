@@ -20,29 +20,31 @@
    - 高清立绘点击 → happy 变体 3s。
    ═══════════════════════════════════════════════════════════ */
 import type {
-  AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi, PixelRows, PortraitArt,
-  SheetFrame, SkinId, SpriteGrid, WhaleFrame,
+  AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi, PixelRows,
+  PortraitArt, SheetArt, SheetFrame, SkinId, SpriteGrid, WhaleFrame,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { DEEPY } from './data/deepy.ts';
 import { WHALEGIRL } from './data/whalegirl.ts';
 import { WHALE_FRAMES } from './data/whale.ts';
 import { CLAUDE_GIRL_SPRITE, WHALE_GIRL_SPRITE } from './data/girls.ts';
-import { WHALEGIRL_IMG } from './data/timings.ts';
+import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, WHALEGIRL_IMG } from './data/timings.ts';
 
-const SHEET_DIR = 'assets/whalegirl-sheet/';
-/** 精灵图单格尺寸（源帧 301×288，22 个动画一致）。 */
-const CELL_W = 301;
-const CELL_H = 288;
+/** 精灵图单格尺寸（源帧统一 301×288）。 */
+const CELL: readonly [number, number] = [301, 288];
+/** 走 AVIF 精灵图轨的形象（一个动画一张图）。 */
+const SHEETS: Record<string, SheetArt> = {
+  whalegirl: { dir: 'assets/whalegirl-sheet/', cell: CELL, timings: WHALEGIRL_IMG },
+  'claude-girl': { dir: 'assets/claude-girl-sheet/', cell: CELL, timings: CLAUDE_GIRL_IMG },
+  'codex-girl': { dir: 'assets/codex-girl-sheet/', cell: CELL, timings: CODEX_GIRL_IMG },
+};
 const PT_DIR = 'assets/portraits/';
 const SPLASH_PALETTE: Record<string, string> = {
   D: '#142660', B: '#4E6FFF', L: '#BEE1FF', W: '#FFFFFF', H: '#CC3399', Z: '#808080',
 };
 
-/** 高清立绘（真图）：源 dsh-TUI/assets/{claude-girl,codex-girl,whale-girl} */
+/** 高清立绘（真图）：只剩女仆鲸娘——她没有动画帧，保持静态 */
 const PORTRAITS: Record<string, PortraitArt> = {
-  'claude-girl': { dir: `${PT_DIR}claude-girl/`, normal: 'claude-girl.png', happy: 'claude-girl-happy.png' },
-  'codex-girl': { dir: `${PT_DIR}codex-girl/`, normal: 'codex-girl.png', happy: 'codex-girl-happy.png' },
   'maid-girl': { dir: `${PT_DIR}whale-girl/`, normal: 'whale-girl.png', happy: 'whale-girl-happy.png' },
 };
 
@@ -77,8 +79,15 @@ function isSpriteGrid(value: unknown): value is SpriteGrid {
 function pack(skin: SkinId): PetPack {
   const portrait = PORTRAITS[skin];
   if (portrait !== undefined) return { type: 'portrait', art: portrait, size: [0, 0] };
+  const sheet = SHEETS[skin];
+  if (sheet !== undefined) {
+    // 鲸娘额外带一份 42×30 字符格帧包，作图像未就绪时的回落
+    const fallback = skin === 'whalegirl'
+      ? { palette: WHALEGIRL.palette, anims: WHALEGIRL.animations, size: WHALEGIRL.size }
+      : { size: [sheet.cell[0], sheet.cell[1]] as [number, number] };
+    return { type: 'sheet', sheet, ...fallback };
+  }
   if (skin === 'deepy') return { type: 'anim', palette: DEEPY.palette, anims: DEEPY.animations, size: DEEPY.size };
-  if (skin === 'whalegirl') return { type: 'whalegirl', palette: WHALEGIRL.palette, anims: WHALEGIRL.animations, size: WHALEGIRL.size };
   if (skin === 'whale') return { type: 'whale', palette: SPLASH_PALETTE, frames: WHALE_FRAMES, size: [40, 25] };
   // 静态精灵表在 data/girls.ts 里已经是 30×30 二维数组（每格 [r,g,b] 或 null）
   if (skin === 'claudegirl') {
@@ -94,14 +103,14 @@ function pack(skin: SkinId): PetPack {
   return { type: 'none', size: [0, 0] };
 }
 
-// ── 鲸娘原生像素帧（一张精灵图 / 动画，懒加载 + 缓存）──────
+// ── 原生像素帧：一个动画一张 AVIF 精灵图（懒加载 + 缓存）──
 interface ImageAnim {
   key: string;
   img: HTMLImageElement;
   /** 图集列数（行数 = ceil(帧数 / 列数)） */
   cols: number;
   /** 帧时长（ms），与 timings.json 一致 */
-  durs: number[];
+  durs: readonly number[];
   total: number;
   ready: boolean;
   bad: boolean;
@@ -109,25 +118,26 @@ interface ImageAnim {
 
 const imgAnims: Record<string, ImageAnim> = Object.create(null) as Record<string, ImageAnim>;
 
-function imageAnim(key: string): ImageAnim | null {
-  const list = WHALEGIRL_IMG[key];
-  if (list === undefined) return null;
-  const cached = imgAnims[key];
+function imageAnim(art: SheetArt, key: string): ImageAnim | null {
+  const durs = art.timings[key];
+  if (durs === undefined) return null;
+  const id = `${art.dir}${key}`;
+  const cached = imgAnims[id];
   if (cached !== undefined) return cached;
   const img = new Image();
   const a: ImageAnim = {
     key, img,
-    cols: Math.ceil(Math.sqrt(list.length)),
-    durs: list.map(entry => entry.dur),
+    cols: Math.ceil(Math.sqrt(durs.length)),
+    durs,
     total: 0,
     ready: false,
     bad: false,
   };
-  for (const entry of list) a.total += entry.dur;
+  for (const d of durs) a.total += d;
   img.onload = () => { a.ready = true; };
   img.onerror = () => { a.bad = true; };
-  img.src = `${SHEET_DIR}${key}.avif`;
-  imgAnims[key] = a;
+  img.src = `${id}.avif`;
+  imgAnims[id] = a;
   return a;
 }
 
@@ -144,16 +154,17 @@ function frameIndexAt(a: ImageAnim, t: number): number {
 }
 
 /** 当前帧在图集里的源矩形。 */
-function sheetFrameAt(key: string, t: number): SheetFrame | null {
-  const a = imageAnim(key);
+function sheetFrameAt(art: SheetArt, key: string, t: number): SheetFrame | null {
+  const a = imageAnim(art, key);
   if (a === null || !a.ready || a.bad) return null;
   const i = frameIndexAt(a, t);
+  const [cw, ch] = art.cell;
   return {
     img: a.img,
-    sx: (i % a.cols) * CELL_W,
-    sy: Math.floor(i / a.cols) * CELL_H,
-    w: CELL_W,
-    h: CELL_H,
+    sx: (i % a.cols) * cw,
+    sy: Math.floor(i / a.cols) * ch,
+    w: cw,
+    h: ch,
   };
 }
 
@@ -249,16 +260,18 @@ export class Player implements Pet {
   private whalePhase = 0;
   private whaleLastBlink = 0;
   private heartStart = 0;
+  private sheet: SheetArt | null;
 
   constructor(skin: SkinId) {
     this.skin = skin;
     this.pack = pack(skin);
-    if (this.pack.type === 'anim' || this.pack.type === 'whalegirl') {
+    this.sheet = this.pack.sheet ?? null;
+    if (this.pack.type === 'anim' || this.pack.type === 'sheet') {
       for (const a of this.pack.anims ?? []) {
         this.anims[a.key] = { frames: a.frames, total: a.frames.reduce((s, f) => s + f.dur, 0) };
       }
     }
-    if (this.pack.type === 'whalegirl') imageAnim('idle'); // 首屏预载
+    if (this.sheet !== null) imageAnim(this.sheet, 'idle'); // 首屏预载
     if (this.pack.type === 'portrait') {
       for (const key of Object.keys(PORTRAITS)) {
         if (PORTRAITS[key] === this.pack.art) { this.portraitKey = key; break; }
@@ -275,13 +288,18 @@ export class Player implements Pet {
   setMood(mood: string): void {
     if (this.mood === mood) return;
     this.mood = mood;
-    if (this.pack.type === 'anim' || this.pack.type === 'whalegirl') {
-      const key = MOOD_ANIM[mood] ?? 'idle';
-      if (this.anims[key] !== undefined && this.animKey !== key) {
+    const key = MOOD_ANIM[mood] ?? 'idle';
+    if (this.sheet !== null) {
+      if (this.sheet.timings[key] !== undefined && this.animKey !== key) {
         this.animKey = key;
         this.animStart = this.time;
+        imageAnim(this.sheet, key);
       }
-      if (this.pack.type === 'whalegirl') imageAnim(key);
+      return;
+    }
+    if (this.pack.type === 'anim' && this.anims[key] !== undefined && this.animKey !== key) {
+      this.animKey = key;
+      this.animStart = this.time;
     }
   }
 
@@ -292,7 +310,7 @@ export class Player implements Pet {
       portraitImage(this.portraitKey, 'happy');
       return;
     }
-    if (this.pack.type !== 'anim' && this.pack.type !== 'whalegirl' && this.pack.type !== 'whale') return;
+    if (this.pack.type !== 'anim' && this.pack.type !== 'sheet' && this.pack.type !== 'whale') return;
     const t = this.time;
     this.clicks = this.clicks.filter(x => x > t - TICKLE_WINDOW_MS);
     this.clicks.push(t);
@@ -303,11 +321,11 @@ export class Player implements Pet {
       this.heartAfter = false;
     } else {
       this.override = { key: fracX < 0.5 ? 'poke-left' : 'poke-right', start: t, until: t + SPLASH_POKE_MS };
-      this.heartAfter = this.pack.type === 'whalegirl';
+      this.heartAfter = this.skin === 'whalegirl';
     }
-    if (this.pack.type === 'whalegirl' && this.override !== null) {
-      imageAnim(this.override.key);
-      if (this.heartAfter) imageAnim('smile-hearts');
+    if (this.sheet !== null && this.override !== null) {
+      imageAnim(this.sheet, this.override.key);
+      if (this.heartAfter) imageAnim(this.sheet, 'smile-hearts');
     }
   }
 
@@ -333,10 +351,10 @@ export class Player implements Pet {
     return this.override !== null ? this.override.start : this.animStart;
   }
 
-  /** 当前帧的字符格 rows（鲸娘加载中 / 无图像时的回退）。 */
+  /** 当前帧的字符格 rows（仅鲸娘有字符回退包；其余精灵图形象未就绪时返回 null）。 */
   frameRows(): string[] | null {
     const pk = this.pack;
-    if (pk.type === 'anim' || pk.type === 'whalegirl') {
+    if (pk.type === 'anim' || pk.type === 'sheet') {
       const key = this.currentKey();
       const a = this.anims[key] ?? this.anims.idle ?? this.anims[Object.keys(this.anims)[0] ?? ''];
       if (a === undefined) return null;
@@ -393,10 +411,10 @@ export class Player implements Pet {
     return null;
   }
 
-  /** 当前帧在图集中占的格子（仅鲸娘精灵图轨）。 */
+  /** 当前帧在图集中占的格子（仅精灵图轨形象）。 */
   frameCell(): SheetFrame | null {
-    if (this.pack.type !== 'whalegirl') return null;
-    return sheetFrameAt(this.currentKey(), this.time - this.currentStart());
+    if (this.sheet === null) return null;
+    return sheetFrameAt(this.sheet, this.currentKey(), this.time - this.currentStart());
   }
 
   private currentPortrait(): HTMLImageElement | null {
@@ -424,7 +442,7 @@ export class Player implements Pet {
       layer.imageSmooth(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
       return;
     }
-    if (pk.type === 'whalegirl') {
+    if (pk.type === 'sheet') {
       const cell = this.frameCell();
       if (cell !== null) {
         // 1 源像素 = 整数个物理像素（最近邻放大才不会糊）
@@ -442,7 +460,7 @@ export class Player implements Pet {
         return;
       }
     }
-    if (pk.type === 'anim' || pk.type === 'whalegirl' || pk.type === 'whale') {
+    if (pk.type === 'anim' || pk.type === 'sheet' || pk.type === 'whale') {
       const rows = this.frameRows();
       if (rows === null || rows.length === 0) return;
       const cw0 = TUI.cw;
@@ -501,7 +519,8 @@ export const PetKit: PetKitApi = {
       portraitImage(skin, 'normal');
       portraitImage(skin, 'happy');
     }
-    if (skin === 'whalegirl') imageAnim('idle');
+    const art = SHEETS[skin];
+    if (art !== undefined) imageAnim(art, 'idle');
   },
   PORTRAITS,
   MOOD_ANIM,
