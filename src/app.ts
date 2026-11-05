@@ -93,7 +93,7 @@ const state: AppState = {
   model: MODELS[0] ?? 'deepseek-v4-flash',
   temperature: 0.7, topP: 0.9, maxTokens: 8192, budget: 10, web: false,
 
-  panelOpen: false,
+  panelOpen: true,
   panelTabs: [
     { id: 'companion', label: '♥' }, { id: 'todos', label: '✓' }, { id: 'jobs', label: '⚙' },
     { id: 'context', label: '◫' }, { id: 'tips', label: '?' }, { id: 'themes', label: '◐' },
