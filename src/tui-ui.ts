@@ -308,11 +308,15 @@ function drawPanel(): void {
   if (!App.state.panelOpen || L.panel.w <= 0) return;
   const P = L.panel;
   TUI.fill(P.x, P.y, P.w, P.h, { bg: T().panel });
-  TUI.vline(P.x, P.y, P.h, T().border, T().panel);
+  const resizeHover = App.state.panelResizeHover;
+  if (resizeHover) TUI.fill(P.x, P.y, 1, P.h, { bg: T().panel2 });
+  TUI.vline(P.x, P.y, P.h, resizeHover ? T().accent : T().border, resizeHover ? T().panel2 : T().panel);
   hit('panelresize', P.x, P.y, 1, P.h, 'panelresize', '拖动调整侧栏');
-  // 拖拽把手：边界中段画三格短竖线，提示可以左右拖
+  // 拖拽把手：边界中段画三格短竖线；悬停时整列转 accent 并加底色
   const gripY = P.y + Math.floor(P.h / 2) - 1;
-  for (let i = 0; i < 3; i++) TUI.put(P.x, gripY + i, '┆', T().accentDim, T().panel);
+  const gripFg = resizeHover ? T().accent : T().accentDim;
+  const gripBg = resizeHover ? T().panel2 : T().panel;
+  for (let i = 0; i < 3; i++) TUI.put(P.x, gripY + i, '┆', gripFg, gripBg, resizeHover ? ST.BOLD : 0);
   const tabs = App.state.panelTabs;
   let x = P.x + 1;
   const tabW = Math.floor((P.w - 2) / tabs.length);

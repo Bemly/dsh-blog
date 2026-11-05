@@ -95,6 +95,7 @@ const state: AppState = {
 
   panelOpen: true,
   panelCols: 0,
+  panelResizeHover: false,
   panelTabs: [
     { id: 'companion', label: '♥' }, { id: 'todos', label: '✓' }, { id: 'jobs', label: '⚙' },
     { id: 'context', label: '◫' }, { id: 'tips', label: '?' }, { id: 'themes', label: '◐' },
@@ -439,6 +440,7 @@ function resetCompanion(): void {
   state.petOffset.y = 0;
   state.petDragging = false;
   state.petHover = false;
+  state.panelResizeHover = false;
   dragBase = null;
   pet.hold(false);
 }
@@ -989,16 +991,17 @@ function onMove(px: number, py: number): void {
   const cell = TUI.pxToCell(px, py);
   let ph: string | null = null;
   let ah: string | null = null;
-  let overHit = false;
+  let overClickable = false;
   let overResize = false;
   for (const h of hits) {
     if (cell.col >= h.x && cell.col < h.x + h.w && cell.row >= h.y && cell.row < h.y + h.h) {
       if (h.id.startsWith('param:')) ph = h.id.slice(6);
       if (h.id.startsWith('action:')) ah = h.id.slice(7);
       if (h.id === 'panelresize') overResize = true;
-      overHit = true;
+      else if (h.action !== null) overClickable = true;
     }
   }
+  state.panelResizeHover = overResize && state.overlay === null;
   if (resizing) applyPanelResize(cell.col);
   state.paramHover = ph;
   state.actionHover = ah;
@@ -1012,10 +1015,10 @@ function onMove(px: number, py: number): void {
     lastActivity = now();
   }
   const grab = dragBase !== null;
-  const resizeCursor = resizing || (overResize && state.overlay === null);
+  const resizeCursor = resizing || state.panelResizeHover;
   document.body.style.cursor = resizeCursor
     ? 'col-resize'
-    : (grab ? 'grabbing' : (state.petHover ? 'grab' : (overHit ? 'pointer' : 'text')));
+    : (grab ? 'grabbing' : (state.petHover ? 'grab' : (overClickable ? 'pointer' : 'text')));
 }
 
 function onUp(_col: number, _row: number, _btn: number, e: MouseEvent): void {
@@ -1025,6 +1028,7 @@ function onUp(_col: number, _row: number, _btn: number, e: MouseEvent): void {
 
 function onLeave(): void {
   state.petHover = false;
+  state.panelResizeHover = false;
   resizing = false;
   if (dragBase !== null) {
     dragBase = null;

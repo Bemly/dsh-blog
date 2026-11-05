@@ -418,6 +418,8 @@ export interface AppState {
   panelOpen: boolean;
   /** 侧栏宽度（字符列）；0 = 按窗口宽度自适应。 */
   panelCols: number;
+  /** 指针停在侧栏边界把手上（高亮）。 */
+  panelResizeHover: boolean;
   panelTabs: PanelTab[];
   panelTab: string;
   panelData: PanelData;
