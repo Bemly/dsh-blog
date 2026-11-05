@@ -93,6 +93,18 @@ function imageAt(img: HTMLImageElement, x: number, y: number, w: number, h: numb
   ctx.drawImage(img, 0, 0, sw, sh, dx, dy, dw, dh);
 }
 
+/** 精灵图里的一格：源矩形 → 目标矩形，最近邻 + 设备像素对齐。 */
+function imageSub(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void {
+  if (ctx === null) return;
+  if (!sw || !sh) return;
+  const dx = D(x);
+  const dy = D(y);
+  const dw = Math.max(1, D(x + w) - dx);
+  const dh = Math.max(1, D(y + h) - dy);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
 /** 图片：高质量缩放（高清立绘不是整数倍像素网格）。 */
 function imageSmooth(img: HTMLImageElement, x: number, y: number, w: number, h: number): void {
   if (ctx === null || !img) return;
@@ -139,6 +151,7 @@ export const PixelLayer: PixelLayerApi = {
   begin,
   end,
   imageAt,
+  imageSub,
   imageSmooth,
   cells,
   rect,

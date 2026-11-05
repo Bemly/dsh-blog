@@ -8,6 +8,7 @@
     "dev": "bun run serve.ts",
     "build": "bun run build.ts",
     "preview": "bun run preview.ts",
+    "encode:sheet": "bun run tools/encode-sheet.ts",
     "typecheck": "tsc --noEmit",
     "check": "bun run typecheck && bun run build"
   },

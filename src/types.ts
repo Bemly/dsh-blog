@@ -190,12 +190,22 @@ export interface RenderToken {
 /** 待绘制的像素画行：字符串行，或「每格颜色或 null」的数组行。 */
 export type PixelRows = ReadonlyArray<string | ReadonlyArray<string | null>>;
 
+/** 精灵图里的一格（图 + 源矩形）。 */
+export interface SheetFrame {
+  readonly img: HTMLImageElement;
+  readonly sx: number;
+  readonly sy: number;
+  readonly w: number;
+  readonly h: number;
+}
+
 /** 独立像素层 API。 */
 export interface PixelLayerApi {
   readonly dpr: number;
   begin(): void;
   end(): void;
   imageAt(img: HTMLImageElement, x: number, y: number, w: number, h: number): void;
+  imageSub(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void;
   imageSmooth(img: HTMLImageElement, x: number, y: number, w: number, h: number): void;
   cells(x: number, y: number, cw: number, ch: number, rows: PixelRows, palette: Record<string, string> | null): void;
   rect(x0: number, y0: number, x1: number, y1: number, color: string): void;
@@ -235,7 +245,7 @@ export interface Pet {
   click(fracX: number): void;
   interact(): void;
   frameRows(): string[] | null;
-  frameImage(): HTMLImageElement | null;
+  frameCell(): SheetFrame | null;
   renderTo(layer: PixelLayerApi, x: number, y: number, w: number, h: number): void;
 }
 

@@ -36,6 +36,7 @@ index.html              入口：一块 canvas（字符网格）+ 一个 <script
 serve.ts                开发服务器：Bun.serve + Bun.Transpiler 现场转译 .ts
 build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/
 preview.ts              预览 dist/
+tools/encode-sheet.ts   逐帧 WebP → AVIF 精灵图（ffmpeg + avifenc）
 tsconfig.json           strict / noUnusedLocals / 等
 src/
   main.ts               入口：找 #tui canvas → start()
@@ -53,7 +54,8 @@ src/
     girls.ts            30×30 静态真彩精灵（claude / whale-girl）
     timings.ts          鲸娘原生像素帧时间表
 assets/
-  whalegirl/            鲸娘「原生像素帧」：<动画>/<NN>.webp
+  whalegirl/            鲸娘「原生像素帧」源素材：<动画>/<NN>.webp（267 帧）
+  whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
   portraits/            高清立绘：claude-girl / codex-girl / whale-girl（normal + happy）
 ```
 
@@ -63,7 +65,7 @@ assets/
 
 | id | 名称 | 形态 | 素材 |
 |---|---|---|---|
-| `whalegirl` | 鲸娘 · 动画 | 原生像素帧 22 动画 / 267 帧 | `assets/whalegirl/` |
+| `whalegirl` | 鲸娘 · 动画 | 原生像素帧 22 动画 / 267 帧（AVIF 精灵图） | `assets/whalegirl-sheet/` |
 | `maid-girl` | 鲸娘 · 女仆 | 高清立绘 464×464（+ happy） | `assets/portraits/whale-girl/` |
 | `claude-girl` | Claude 娘 | 高清立绘 1024×1024（+ happy） | `assets/portraits/claude-girl/` |
 | `codex-girl` | Codex 娘 | 高清立绘 628×628（+ happy） | `assets/portraits/codex-girl/` |
@@ -77,16 +79,28 @@ assets/
 - 原生像素帧与字符动画走「真像素」路径，立绘走高质量缩放的 `imageSmooth`
   （真图不是整数倍像素网格，强制最近邻会锯齿）。
 
-## 鲸娘素材（原版搬运）
+## 鲸娘素材（原版搬运 + 精灵图）
 
 `assets/whalegirl/` 来自 dsh-TUI 的 `assets/whaleGirl/img/`
 （由用户提供的鲸娘 GIF 转出的原生像素帧，288px 高、保留真实 alpha）：
 
 - 22 个动画、267 帧全部搬运，无损转成 WebP（12MB → 6.9MB）；
-- 帧时间表 `src/data/timings.ts` 沿用原 `timings.json` 的 `dur`；
-- 首屏只预载 `idle`，其余动画按需懒加载；
-- 加载完成前回落到 42×30 字符格帧包（`src/data/whalegirl.ts`），与原版
-  「无图像协议 → 字母格」的回退路径一致。
+- 运行时用的是 `assets/whalegirl-sheet/<key>.avif`：**一个动画一张 AVIF 精灵图**，
+  由 `tools/encode-sheet.ts` 从上面的逐帧 WebP 生成（`ffmpeg` 拼 `tile` +
+  `avifenc -q 60 --qalpha 60 -s 0`）；
+- 267 个请求 / 6.9MB → **22 个请求 / 1.3MB**，实测 PSNR 40.05 dB、SSIM 0.994
+  （合成到 `#2A2F34` 背景后与无损源比对）；
+- 布局：单格 301×288，`cols = ceil(sqrt(n))`、`rows = ceil(n/cols)`，行优先，
+  空位透明；取帧仍是「时间 → 帧号 → 格号」，逐帧时长表 `src/data/timings.ts`
+  沿用原 `timings.json` 的 `dur`，所以打断/重播语义与逐帧版完全一致；
+- 首屏只预载 `idle`，其余动画按需懒加载；加载完成前回落到 42×30 字符格帧包
+  （`src/data/whalegirl.ts`），与原版「无图像协议 → 字母格」的回退路径一致。
+
+改素材后重新生成精灵图（需要 `ffmpeg` 和 `avifenc`，`brew install ffmpeg libavif`）：
+
+```bash
+bun run encode:sheet   # assets/whalegirl/ → assets/whalegirl-sheet/
+```
 
 启动页交互也与原版 `SplashMascot` 同一条语义：
 

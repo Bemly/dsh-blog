@@ -2,9 +2,11 @@
    pet.ts — 像素宠物引擎（原版素材 / 原版交互）
    ───────────────────────────────────────────────────────────
    皮肤：
-   - whalegirl   : 鲸娘「原生像素帧」——assets/whalegirl/<key>/<NN>.webp
-                   （源 dsh-TUI assets/whaleGirl/img，无损 WebP，保留 alpha）
-                   缺帧/未加载时回落 42×30 字符格帧包
+   - whalegirl   : 鲸娘「原生像素帧」——一个动画一张 AVIF 精灵图
+                   assets/whalegirl-sheet/<key>.avif
+                   （源 dsh-TUI assets/whaleGirl/img，逐帧 WebP 经
+                    tools/encode-sheet.ts 打包编码）
+                   缺图/未加载时回落 42×30 字符格帧包
    - maid-girl / claude-girl / codex-girl : 高清立绘（normal + happy）
    - deepy       : 42×30 字符动画 ×20
    - whale       : 开屏鲸鱼 40×25 ×22 帧
@@ -19,7 +21,7 @@
    ═══════════════════════════════════════════════════════════ */
 import type {
   AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi, PixelRows, PortraitArt,
-  SkinId, SpriteGrid, WhaleFrame,
+  SheetFrame, SkinId, SpriteGrid, WhaleFrame,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { DEEPY } from './data/deepy.ts';
@@ -28,7 +30,10 @@ import { WHALE_FRAMES } from './data/whale.ts';
 import { CLAUDE_GIRL_SPRITE, WHALE_GIRL_SPRITE } from './data/girls.ts';
 import { WHALEGIRL_IMG } from './data/timings.ts';
 
-const WG_DIR = 'assets/whalegirl/';
+const SHEET_DIR = 'assets/whalegirl-sheet/';
+/** 精灵图单格尺寸（源帧 301×288，22 个动画一致）。 */
+const CELL_W = 301;
+const CELL_H = 288;
 const PT_DIR = 'assets/portraits/';
 const SPLASH_PALETTE: Record<string, string> = {
   D: '#142660', B: '#4E6FFF', L: '#BEE1FF', W: '#FFFFFF', H: '#CC3399', Z: '#808080',
@@ -89,20 +94,17 @@ function pack(skin: SkinId): PetPack {
   return { type: 'none', size: [0, 0] };
 }
 
-// ── 鲸娘原生像素帧（懒加载 + 缓存）─────────────────────────
-interface ImageAnimFrame {
-  dur: number;
-  img: HTMLImageElement;
-  ok: boolean;
-  bad: boolean;
-}
-
+// ── 鲸娘原生像素帧（一张精灵图 / 动画，懒加载 + 缓存）──────
 interface ImageAnim {
   key: string;
-  frames: ImageAnimFrame[];
+  img: HTMLImageElement;
+  /** 图集列数（行数 = ceil(帧数 / 列数)） */
+  cols: number;
+  /** 帧时长（ms），与 timings.json 一致 */
+  durs: number[];
   total: number;
   ready: boolean;
-  loaded: number;
+  bad: boolean;
 }
 
 const imgAnims: Record<string, ImageAnim> = Object.create(null) as Record<string, ImageAnim>;
@@ -112,35 +114,47 @@ function imageAnim(key: string): ImageAnim | null {
   if (list === undefined) return null;
   const cached = imgAnims[key];
   if (cached !== undefined) return cached;
-  const a: ImageAnim = { key, frames: [], total: 0, ready: false, loaded: 0 };
-  for (const entry of list) {
-    const img = new Image();
-    const rec: ImageAnimFrame = { dur: entry.dur, img, ok: false, bad: false };
-    img.onload = () => {
-      rec.ok = true;
-      a.loaded += 1;
-      if (a.loaded >= a.frames.length) a.ready = true;
-    };
-    img.onerror = () => { rec.bad = true; };
-    img.src = `${WG_DIR}${key}/${entry.file}`;
-    a.frames.push(rec);
-    a.total += entry.dur;
-  }
+  const img = new Image();
+  const a: ImageAnim = {
+    key, img,
+    cols: Math.ceil(Math.sqrt(list.length)),
+    durs: list.map(entry => entry.dur),
+    total: 0,
+    ready: false,
+    bad: false,
+  };
+  for (const entry of list) a.total += entry.dur;
+  img.onload = () => { a.ready = true; };
+  img.onerror = () => { a.bad = true; };
+  img.src = `${SHEET_DIR}${key}.avif`;
   imgAnims[key] = a;
   return a;
 }
 
-function imageFrameAt(key: string, t: number): HTMLImageElement | null {
-  const a = imageAnim(key);
-  if (a === null || !a.ready || a.total <= 0) return null;
+/** 时间 → 帧号（按累加时长定位，与逐帧版本完全一致）。 */
+function frameIndexAt(a: ImageAnim, t: number): number {
+  if (a.total <= 0) return 0;
   const tt = ((t % a.total) + a.total) % a.total;
   let acc = 0;
-  for (const f of a.frames) {
-    acc += f.dur;
-    if (tt < acc) return f.ok ? f.img : null;
+  for (let i = 0; i < a.durs.length; i++) {
+    acc += a.durs[i] ?? 0;
+    if (tt < acc) return i;
   }
-  const last = a.frames[a.frames.length - 1];
-  return last !== undefined && last.ok ? last.img : null;
+  return a.durs.length - 1;
+}
+
+/** 当前帧在图集里的源矩形。 */
+function sheetFrameAt(key: string, t: number): SheetFrame | null {
+  const a = imageAnim(key);
+  if (a === null || !a.ready || a.bad) return null;
+  const i = frameIndexAt(a, t);
+  return {
+    img: a.img,
+    sx: (i % a.cols) * CELL_W,
+    sy: Math.floor(i / a.cols) * CELL_H,
+    w: CELL_W,
+    h: CELL_H,
+  };
 }
 
 // ── 高清立绘（懒加载 + 缓存）──────────────────────────────
@@ -379,10 +393,10 @@ export class Player implements Pet {
     return null;
   }
 
-  /** 当前帧的原生像素图（仅鲸娘图像轨）。 */
-  frameImage(): HTMLImageElement | null {
+  /** 当前帧在图集中占的格子（仅鲸娘精灵图轨）。 */
+  frameCell(): SheetFrame | null {
     if (this.pack.type !== 'whalegirl') return null;
-    return imageFrameAt(this.currentKey(), this.time - this.currentStart());
+    return sheetFrameAt(this.currentKey(), this.time - this.currentStart());
   }
 
   private currentPortrait(): HTMLImageElement | null {
@@ -411,19 +425,20 @@ export class Player implements Pet {
       return;
     }
     if (pk.type === 'whalegirl') {
-      const img = this.frameImage();
-      if (img !== null) {
-        const sw = img.naturalWidth || img.width;
-        const sh = img.naturalHeight || img.height;
-        const k = Math.max(1, Math.round(window.devicePixelRatio || 1));
-        let dw = (sw * k) / (window.devicePixelRatio || 1);
-        let dh = (sh * k) / (window.devicePixelRatio || 1);
+      const cell = this.frameCell();
+      if (cell !== null) {
+        // 1 源像素 = 整数个物理像素（最近邻放大才不会糊）
+        const dpr = window.devicePixelRatio || 1;
+        const k = Math.max(1, Math.round(dpr));
+        let dw = (cell.w * k) / dpr;
+        let dh = (cell.h * k) / dpr;
         if (dw > w || dh > h) {
           const s = Math.min(w / dw, h / dh);
           dw *= s;
           dh *= s;
         }
-        layer.imageAt(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        layer.imageSub(cell.img, cell.sx, cell.sy, cell.w, cell.h,
+          x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
         return;
       }
     }
