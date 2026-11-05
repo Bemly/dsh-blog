@@ -533,38 +533,47 @@ function drawMessages(): void {
     layoutMessage(msg, area.w, lines, streamAcc);
   }
   if (lines.length <= 1) lines.push({ kind: 'label', text: '  输入消息开始新的对话', fg: T().dim });
+  // 逻辑行 → 视觉行：图片占 rows 行，其余各占 1 行（否则后续文字会压进图里）
+  const heights = lines.map(ln => ln.kind === 'image' ? Math.max(1, ln.rows) : 1);
+  const totalRows = heights.reduce((a, b) => a + b, 0);
   const visible = area.h;
-  const maxScroll = Math.max(0, lines.length - visible);
+  const maxScroll = Math.max(0, totalRows - visible);
   if (App.state.autoScroll && !App.state.userScrolled) App.state.scroll = maxScroll;
   const scroll = Math.max(0, Math.min(App.state.scroll, maxScroll));
   App.state.scroll = scroll;
   // 手动滚到底部后恢复自动滚动
   if (App.state.userScrolled && scroll >= maxScroll) App.state.userScrolled = false;
-  for (let i = scroll; i < lines.length && i - scroll < visible; i++) {
+  let cursor = 0;
+  for (let i = 0; i < lines.length; i++) {
     const ln = lines[i];
-    if (ln === undefined || ln.kind === 'gap') continue;
-    const y = area.y + (i - scroll);
+    const h = heights[i] ?? 1;
+    const top = cursor;
+    cursor += h;
+    if (ln === undefined) continue;
+    if (top + h <= scroll || top >= scroll + visible) continue;
+    if (ln.kind === 'gap') continue;
+    const rel = top - scroll;
     if (ln.kind === 'image') {
-      // 图片跨到输入框时按可见行**裁剪源图**，不能压缩目标高度（会压扁）
-      const avail = area.y + area.h - y;
-      if (avail <= 0) continue;
-      drawLine(area.x, y, area.w, ln, avail);
+      // 上下两端都按源图裁剪，目标高度只减不缩
+      const clipTop = Math.max(0, -rel);
+      const rows = Math.max(1, Math.min(h - clipTop, visible - rel - clipTop));
+      drawLine(area.x, area.y + rel + clipTop, area.w, ln, rows, clipTop);
       continue;
     }
-    drawLine(area.x, y, area.w, ln);
+    drawLine(area.x, area.y + rel, area.w, ln);
   }
   // 滚动条（原版 ScrollbarGutter）
   if (maxScroll > 0) {
     const trackX = m.x + m.w - 1;
     const trackH = visible;
-    const thumbH = Math.max(1, Math.round(trackH * visible / lines.length));
+    const thumbH = Math.max(1, Math.round(trackH * visible / totalRows));
     const thumbY = area.y + Math.round((trackH - thumbH) * (scroll / maxScroll));
     TUI.fill(trackX, area.y, 1, trackH, { bg: T().panel2 });
     TUI.fill(trackX, thumbY, 1, thumbH, { bg: T().dim });
   }
 }
 
-function drawLine(x: number, y: number, w: number, ln: Line, clipRows?: number): void {
+function drawLine(x: number, y: number, w: number, ln: Line, clipRows?: number, clipTop = 0): void {
   switch (ln.kind) {
     case 'text':
     case 'user':
@@ -625,9 +634,10 @@ function drawLine(x: number, y: number, w: number, ln: Line, clipRows?: number):
       const img = postImage(ln.src);
       if (img !== null) {
         const nh = img.naturalHeight || 1;
-        const sh = Math.max(1, Math.round(nh * rows / Math.max(1, ln.rows)));
-        // 裁源图顶部、目标框等比缩短，保持宽高比
-        PixelLayer.imageSubSmooth(img, 0, 0, img.naturalWidth, sh,
+        const y0 = Math.round(nh * clipTop / Math.max(1, ln.rows));
+        const y1 = Math.round(nh * (clipTop + rows) / Math.max(1, ln.rows));
+        // 裁源图、目标框等比缩短，保持宽高比
+        PixelLayer.imageSubSmooth(img, 0, y0, img.naturalWidth, Math.max(1, y1 - y0),
           (x + 1) * TUI.cw, y * TUI.ch, ln.cols * TUI.cw, rows * TUI.ch);
       } else {
         TUI.fill(x + 1, y, ln.cols, rows, { bg: T().panel2 });
