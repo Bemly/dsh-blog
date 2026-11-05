@@ -28,7 +28,7 @@ import { DEEPY } from './data/deepy.ts';
 import { WHALEGIRL } from './data/whalegirl.ts';
 import { WHALE_FRAMES } from './data/whale.ts';
 import { CLAUDE_GIRL_SPRITE, WHALE_GIRL_SPRITE } from './data/girls.ts';
-import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, MAID_ANIME_IMG, MAID_IMG, WHALEGIRL_IMG } from './data/timings.ts';
+import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, MAID_ANIME_IMG, MAID_IMG, PLUSH_IMG, WHALEGIRL_IMG } from './data/timings.ts';
 
 /** 精灵图单格尺寸（像素画统一 301×288）。 */
 const CELL: readonly [number, number] = [301, 288];
@@ -40,6 +40,8 @@ const SHEETS: Record<string, SheetArt> = {
   // 插画素材：非像素画，缩放走高质量插值
   'whale-maid': { dir: 'assets/whale-maid-sheet/', cell: [489, 709], timings: MAID_IMG, smooth: true },
   'whale-maid-anime': { dir: 'assets/whale-maid-anime-sheet/', cell: [540, 540], timings: MAID_ANIME_IMG, smooth: true },
+  // 毛绒版：单帧 630×819，保证每张精灵图都 < 4096
+  'whale-maid-plush': { dir: 'assets/whale-maid-plush-sheet/', cell: [630, 819], timings: PLUSH_IMG, smooth: true },
 };
 const PT_DIR = 'assets/portraits/';
 const SPLASH_PALETTE: Record<string, string> = {
