@@ -9,6 +9,8 @@
 渲染没有收益，只会多一层 reconciler）。开发时 Bun 现场转译 TS，构建时
 `bun build` 打成单 chunk。
 
+> 改代码 / 换素材前先看 [AGENTS.md](AGENTS.md)：提交推送规则、精灵图管线、验证清单都在那里。
+
 ## 运行
 
 ```bash
