@@ -1077,6 +1077,12 @@ function tickPetOffset(dt: number): void {
   if (state.petDragging) return;
   const o = state.petOffset;
   if (o.x === 0 && o.y === 0) return;
+  // 窗口尺寸变化后把位移夹回允许范围（侧栏内 / 整页浮动）
+  const lim = UI.companionLimits();
+  if (lim !== null) {
+    o.x = Math.max(lim.minX, Math.min(lim.maxX, o.x));
+    o.y = Math.max(lim.minY, Math.min(lim.maxY, o.y));
+  }
   const k = 1 - Math.exp(-dt / 100);
   o.x += -o.x * k;
   o.y += -o.y * k;

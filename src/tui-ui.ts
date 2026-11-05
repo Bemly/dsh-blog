@@ -394,8 +394,46 @@ function companionSlot(panel: Rect): Rect {
   return { x: panel.x + 1, y: panel.y + panel.h - 1 - h, w: Math.max(4, panel.w - 2), h };
 }
 
+/** 窄屏没有侧栏时：宠物浮在消息区右下角（输入框上方一行）。 */
+function floatSlot(): Rect {
+  const m = layout().main;
+  // 像素上近似方形：列宽 8px、行高 21px，行数按 cw/ch 折算，避免槽位远高于图
+  const cols = Math.max(10, Math.min(28, Math.max(10, m.w - 6), Math.round(m.w * 0.36)));
+  const rows = Math.max(5, Math.min(Math.round(cols * TUI.cw / TUI.ch), m.h - 2));
+  return { x: m.x + m.w - cols - 2, y: m.y + m.h - rows - 1, w: cols, h: rows };
+}
+
+/** 聊天页且窗口放不下侧栏（<92 列）→ 走浮动布局；手动收起侧栏不算。 */
+function floating(): boolean {
+  return App !== null && App.state.screen === 'chat' && TUI.COLS < 92 && App.state.overlay === null;
+}
+
+/** 当前宠物槽位：侧栏内 / 窄屏浮动 / 无。 */
+function companionSlotFor(): Rect | null {
+  if (App === null || App.state.overlay !== null) return null;
+  if (App.state.panelOpen && App.state.panelTab === 'companion' && panelWidth() > 0) {
+    return companionSlot(layout().panel);
+  }
+  if (floating()) return floatSlot();
+  return null;
+}
+
+/** 画宠物本体 + 左右半区命中（跟着拖动位移走）。 */
+function drawCompanionPet(slot: Rect, label: string): void {
+  if (App === null || App.pet === null) return;
+  const cw = TUI.cw;
+  const ch = TUI.ch;
+  const off = App.state.petOffset;
+  App.pet.renderTo(PixelLayer, slot.x * cw + off.x, slot.y * ch + off.y, slot.w * cw, slot.h * ch);
+  const dx = Math.round(off.x / cw);
+  const dy = Math.round(off.y / ch);
+  const half = Math.max(1, Math.floor(slot.w / 2));
+  hit('petside:left', slot.x + dx, slot.y + dy, half, slot.h, 'petside:left', label);
+  hit('petside:right', slot.x + dx + half, slot.y + dy, Math.max(1, slot.w - half), slot.h, 'petside:right', label);
+}
+
 function drawCompanion(panel: Rect): void {
-  if (App === null) return;
+  if (App === null || App.state.overlay !== null) return;
   const mood = App.state.petMood;
   const slot = companionSlot(panel);
   const meta = App.skinMeta(App.state.skin);
@@ -412,40 +450,42 @@ function drawCompanion(panel: Rect): void {
   TUI.text(x, panel.y + 4, clipLine(`当前动作：${animLabel}`, w), T().dim, T().panel);
   TUI.text(x, panel.y + 5, clipLine('点它戳一戳 · 连点挠痒痒 · 拖拽拎起来', w), T().dim, T().panel);
 
-  const cw = TUI.cw;
-  const ch = TUI.ch;
-  const off = App.state.petOffset;
-  if (App.pet !== null) {
-    App.pet.renderTo(PixelLayer, slot.x * cw + off.x, slot.y * ch + off.y, slot.w * cw, slot.h * ch);
-  }
-  // 命中区跟着拖动位移走；左右半区用于 poke-left / poke-right。
-  const dx = Math.round(off.x / cw);
-  const dy = Math.round(off.y / ch);
-  const half = Math.max(1, Math.floor(slot.w / 2));
-  hit('petside:left', slot.x + dx, slot.y + dy, half, slot.h, 'petside:left', meta.label);
-  hit('petside:right', slot.x + dx + half, slot.y + dy, Math.max(1, slot.w - half), slot.h, 'petside:right', meta.label);
+  drawCompanionPet(slot, meta.label);
 }
 
-/** 宠物槽位的 CSS 像素矩形（未加拖动位移）；面板不可见时 null。 */
+/** 窄屏：没有侧栏时，宠物直接浮在消息区右下角。 */
+function drawFloatingPet(): void {
+  if (App === null) return;
+  drawCompanionPet(floatSlot(), App.skinMeta(App.state.skin).label);
+}
+
+/** 宠物槽位的 CSS 像素矩形（未加拖动位移）；不可见时 null。 */
 function companionPetRect(): PetRect | null {
-  if (App === null || !App.state.panelOpen || App.state.panelTab !== 'companion') return null;
-  const P = layout().panel;
-  if (P.w <= 0) return null;
-  const s = companionSlot(P);
+  const s = companionSlotFor();
+  if (s === null) return null;
   return { x: s.x * TUI.cw, y: s.y * TUI.ch, w: s.w * TUI.cw, h: s.h * TUI.ch };
 }
 
-/** 拖动偏移上限：宠物整体不许出面板。 */
+/** 拖动偏移上限：侧栏内不出面板；窄屏浮动时放开到整页。 */
 function companionLimits(): PetDragLimits | null {
-  if (App === null || !App.state.panelOpen || App.state.panelTab !== 'companion') return null;
-  const P = layout().panel;
-  if (P.w <= 0) return null;
-  const s = companionSlot(P);
+  const s = companionSlotFor();
+  if (s === null) return null;
+  const inPanel = App !== null && App.state.panelOpen && App.state.panelTab === 'companion' && panelWidth() > 0;
+  if (inPanel) {
+    const P = layout().panel;
+    return {
+      minX: Math.min(0, (P.x - s.x) * TUI.cw),
+      maxX: Math.max(0, (P.x + P.w - (s.x + s.w)) * TUI.cw),
+      minY: Math.min(0, (P.y + 2 - s.y) * TUI.ch),
+      maxY: Math.max(0, (P.y + P.h - 1 - (s.y + s.h)) * TUI.ch),
+    };
+  }
+  // 浮动：整页可拖，只要宠物不出视口
   return {
-    minX: Math.min(0, (P.x - s.x) * TUI.cw),
-    maxX: Math.max(0, (P.x + P.w - (s.x + s.w)) * TUI.cw),
-    minY: Math.min(0, (P.y + 2 - s.y) * TUI.ch),
-    maxY: Math.max(0, (P.y + P.h - 1 - (s.y + s.h)) * TUI.ch),
+    minX: -s.x * TUI.cw,
+    maxX: (TUI.COLS - (s.x + s.w)) * TUI.cw,
+    minY: -s.y * TUI.ch,
+    maxY: (TUI.ROWS - (s.y + s.h)) * TUI.ch,
   };
 }
 
@@ -1292,6 +1332,7 @@ function drawAll(): void {
     drawComposer();
     drawStatus();
     drawPanel();
+    if (floating()) drawFloatingPet();
   }
   if (App.state.overlay === 'help') drawHelp();
   if (App.state.overlay === 'cmdmenu') drawCommandMenu();
