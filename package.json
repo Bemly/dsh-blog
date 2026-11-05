@@ -4,6 +4,7 @@
   "type": "module",
   "version": "0.1.0",
   "description": "dsh-TUI 的 Web 版「Canvas 真 TUI」",
+  "license": "Net-SNMP",
   "scripts": {
     "dev": "bun run serve.ts",
     "build": "bun run build.ts",

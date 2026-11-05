@@ -188,3 +188,7 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 - 设置页控件命中被整行命中吞掉、开关错位；
 - 手动滚到底后不再恢复自动滚动；
 - 斜杠命令、设置页主题切换、首启引导、光标闪烁等补全。
+
+## License
+
+[Net-SNMP](https://spdx.org/licenses/Net-SNMP.html)（SPDX: `Net-SNMP`），全文见 [LICENSE](LICENSE)。
