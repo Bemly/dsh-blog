@@ -53,7 +53,6 @@ src/
     whalegirl.ts        鲸娘 42×30 字符格帧包
     deepy.ts            deepy 42×30 动画
     whale.ts            开屏鲸鱼 40×25 帧
-    girls.ts            30×30 静态真彩精灵（claude / whale-girl）
     timings.ts          三个角色的逐帧时长表（ms）
 assets/
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）

@@ -71,7 +71,6 @@ function parse(text: string): Block[] {
 
   while (i < lines.length) {
     const line = lines[i] ?? '';
-    const th = T();
 
     // Mermaid（必须在通用代码块之前匹配）
     if (/^```mermaid/i.test(line)) {
@@ -177,7 +176,6 @@ function parse(text: string): Block[] {
       i++;
     }
     blocks.push({ type: 'p', tokens: inline(para.join(' ')) });
-    void th;
   }
   flushList();
   return blocks;

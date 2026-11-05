@@ -998,7 +998,7 @@ function drawSessions(): void {
     const s = app.state.sessions[id];
     const name = s?.title ?? id;
     const isSel = i === app.state.sessionSel;
-    const active = s !== undefined && i === 0;
+    const active = app.state.groups.some(g => g.sessions.some(x => x.id === id && x.active));
     const fg = isSel ? T().suggestion : T().fg;
     const st = isSel ? ST.BOLD : 0;
     if (isSel) TUI.fill(x + 2, row, bw - 4, 1, { bg: T().accentDim });

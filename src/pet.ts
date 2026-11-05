@@ -7,10 +7,10 @@
                    （源 dsh-TUI assets/whaleGirl/img，逐帧 WebP 经
                     tools/encode-sheet.ts 打包编码）
                    缺图/未加载时回落 42×30 字符格帧包
-   - maid-girl / claude-girl / codex-girl : 高清立绘（normal + happy）
+   - claude-girl / codex-girl / whale-maid* : 插画 / 像素精灵图（同一套 SheetArt 轨道）
+   - maid-girl   : 高清立绘（normal + happy）
    - deepy       : 42×30 字符动画 ×20
    - whale       : 开屏鲸鱼 40×25 ×22 帧
-   - claude / whale-girl 30×30 静态精灵仍在（字符回退路径）
 
    启动页交互（与 dsh-TUI SplashMascot 同一条语义）：
    - 稳态 idle 循环；
@@ -20,14 +20,13 @@
    - 高清立绘点击 → happy 变体 3s。
    ═══════════════════════════════════════════════════════════ */
 import type {
-  AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi, PixelRows,
-  PortraitArt, SheetArt, SheetFrame, SkinId, SpriteGrid, WhaleFrame,
+  AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi,
+  PortraitArt, SheetArt, SheetFrame, SkinId, WhaleFrame,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { DEEPY } from './data/deepy.ts';
 import { WHALEGIRL } from './data/whalegirl.ts';
 import { WHALE_FRAMES } from './data/whale.ts';
-import { CLAUDE_GIRL_SPRITE, WHALE_GIRL_SPRITE } from './data/girls.ts';
 import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, MAID_ANIME_IMG, MAID_IMG, PLUSH_IMG, WHALEGIRL_IMG } from './data/timings.ts';
 
 /** 精灵图单格尺寸（像素画统一 301×288）。 */
@@ -68,19 +67,6 @@ const TICKLE_MIN_CLICKS = 3;
 /** 点立绘换 happy 变体的时长（原版 LogoV2 MAID_HAPPY_MS）。 */
 const HAPPY_MS = 3000;
 
-function flatToGrid(arr: ReadonlyArray<unknown>, w: number): unknown[][] {
-  const g: unknown[][] = [];
-  const h = Math.floor(arr.length / w);
-  for (let r = 0; r < h; r++) g.push(arr.slice(r * w, (r + 1) * w));
-  return g;
-}
-
-function isSpriteGrid(value: unknown): value is SpriteGrid {
-  if (!Array.isArray(value) || value.length === 0) return false;
-  const first: unknown = value[0];
-  return Array.isArray(first) && first.length === 30;
-}
-
 function pack(skin: SkinId): PetPack {
   const portrait = PORTRAITS[skin];
   if (portrait !== undefined) return { type: 'portrait', art: portrait, size: [0, 0] };
@@ -94,17 +80,6 @@ function pack(skin: SkinId): PetPack {
   }
   if (skin === 'deepy') return { type: 'anim', palette: DEEPY.palette, anims: DEEPY.animations, size: DEEPY.size };
   if (skin === 'whale') return { type: 'whale', palette: SPLASH_PALETTE, frames: WHALE_FRAMES, size: [40, 25] };
-  // 静态精灵表在 data/girls.ts 里已经是 30×30 二维数组（每格 [r,g,b] 或 null）
-  if (skin === 'claudegirl') {
-    const g: unknown = CLAUDE_GIRL_SPRITE;
-    const grid: SpriteGrid = isSpriteGrid(g) ? g : (flatToGrid(g as unknown[], 30) as SpriteGrid);
-    return { type: 'rgb', grid, size: [30, 30] };
-  }
-  if (skin === 'whale-girl') {
-    const g: unknown = WHALE_GIRL_SPRITE;
-    const grid: SpriteGrid = isSpriteGrid(g) ? g : (flatToGrid(g as unknown[], 30) as SpriteGrid);
-    return { type: 'rgb', grid, size: [30, 30] };
-  }
   return { type: 'none', size: [0, 0] };
 }
 
@@ -195,44 +170,8 @@ function portraitImage(key: string, which: 'normal' | 'happy'): PortraitRec | nu
   return rec;
 }
 
-// ── 精灵适配区域（静态精灵用）：水平下采样、垂直成对采样 ──
-function fitGridArray(grid: SpriteGrid, maxW: number, maxH: number): SpriteGrid {
-  const first = grid[0];
-  if (first === undefined) return [];
-  const W = first.length;
-  const H = grid.length;
-  const stepW = W > maxW ? Math.ceil(W / maxW) : 1;
-  const halfH = Math.ceil(H / 2);
-  const stepV = halfH > maxH ? Math.ceil(halfH / maxH) : 1;
-  if (stepW === 1 && stepV === 1) return grid;
-  const out: (readonly (readonly [number, number, number] | null)[])[] = [];
-  if (stepV === 1) {
-    for (let r = 0; r < H; r++) {
-      const line: (readonly [number, number, number] | null)[] = [];
-      for (let c = 0; c < W; c += stepW) line.push(grid[r]?.[c] ?? null);
-      out.push(line);
-    }
-  } else {
-    for (let r = 0; r < H; r += stepV * 2) {
-      const line: (readonly [number, number, number] | null)[] = [];
-      for (let c = 0; c < W; c += stepW) line.push(grid[r]?.[c] ?? null);
-      out.push(line);
-      if (r + 1 < H) {
-        const line2: (readonly [number, number, number] | null)[] = [];
-        for (let c = 0; c < W; c += stepW) line2.push(grid[r + 1]?.[c] ?? null);
-        out.push(line2);
-      }
-    }
-  }
-  return out;
-}
-
 function frameByName(frames: readonly WhaleFrame[], name: string): WhaleFrame | undefined {
   return frames.find(f => f.name === name) ?? frames[0];
-}
-
-function rgbToString(c: readonly [number, number, number] | null): string | null {
-  return c === null ? null : `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
 // ── 播放器 ─────────────────────────────────────────────────
@@ -503,21 +442,6 @@ export class Player implements Pet {
       const dh = natH * sc;
       layer.cells(x + (w - dw) / 2, y + (h - dh) / 2, dw / cols, dh / rowsN, rows, pk.palette ?? null);
       return;
-    }
-    if (pk.type === 'rgb') {
-      const grid = pk.grid ?? [];
-      const fitted = fitGridArray(grid, Math.max(4, Math.round(w)), Math.max(3, Math.round(h)));
-      const first = fitted[0];
-      if (first === undefined) return;
-      const cols = first.length;
-      const rowsN = fitted.length;
-      const natW = cols * TUI.cw;
-      const natH = rowsN * (TUI.ch / 2);
-      const sc = Math.min(1, w / natW, h / natH);
-      const dw = natW * sc;
-      const dh = natH * sc;
-      const rows: PixelRows = fitted.map(line => line.map(c => rgbToString(c)));
-      layer.cells(x + (w - dw) / 2, y + (h - dh) / 2, dw / cols, dh / rowsN, rows, null);
     }
   }
 }

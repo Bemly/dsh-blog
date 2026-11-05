@@ -4,11 +4,6 @@
  */
 
 // ── 像素素材 ───────────────────────────────────────────────
-/** 静态精灵的一格：RGB 三元组或透明。 */
-export type RGBTriple = readonly [number, number, number];
-/** 30×30 静态精灵表。 */
-export type SpriteGrid = ReadonlyArray<ReadonlyArray<RGBTriple | null>>;
-
 /** 字符格动画的一帧（`rows` 是字符点阵，字符 = 调色板键）。 */
 export interface AnimFrame {
   readonly dur: number;
@@ -211,7 +206,7 @@ export interface PixelLayerApi {
 export type SkinId = string;
 
 /** 宠物包类型。 */
-export type PetPackKind = 'anim' | 'sheet' | 'whale' | 'rgb' | 'portrait' | 'none';
+export type PetPackKind = 'anim' | 'sheet' | 'whale' | 'portrait' | 'none';
 
 /** 精灵图素材：目录 + 单格尺寸 + 逐帧时长表。 */
 export interface SheetArt {
@@ -230,7 +225,6 @@ export interface PetPack {
   readonly palette?: Record<string, string>;
   readonly anims?: Anim[];
   readonly frames?: WhaleFrame[];
-  readonly grid?: SpriteGrid;
   readonly art?: PortraitArt;
   readonly sheet?: SheetArt;
 }

@@ -115,7 +115,7 @@ const state: AppState = {
       { type: 'item', text: 'deepy 动画打包', status: 'done' },
       { type: 'item', text: 'whalegirl 图像帧', status: 'done' },
       { type: 'item', text: 'whale 开屏序列', status: 'running' },
-      { type: 'item', text: 'claudegirl 静态精灵', status: 'done' },
+      { type: 'item', text: 'claude-girl 精灵图', status: 'done' },
       { type: 'hr' },
       { type: 'item', text: 'Canvas 帧循环调优', status: 'todo' },
     ],
