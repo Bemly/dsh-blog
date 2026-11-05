@@ -39,6 +39,7 @@ serve.ts                开发服务器：Bun.serve + Bun.Transpiler 现场转�
 build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/
 preview.ts              预览 dist/
 tools/encode-sheet.ts   逐帧 WebP → AVIF 精灵图（ffmpeg + avifenc）
+tools/import-blog.ts    Obsidian 书签目录 → posts.ts + assets/blog（图片转 AVIF）
 tsconfig.json           strict / noUnusedLocals / 等
 src/
   main.ts               入口：找 #tui canvas → start()
@@ -52,6 +53,7 @@ src/
   data/
     whalegirl.ts        鲸娘 42×30 字符格帧包（精灵图未就绪时回落）
     timings.ts          各角色逐帧时长表（ms）
+    posts.ts            文章数据（自动生成：标题 / 摘要 / Markdown 正文）
 assets/
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
   claude-girl-sheet/    Claude 娘 AVIF 精灵图（22 张 / 225 帧）
@@ -60,6 +62,7 @@ assets/
   whale-maid-anime-sheet/ 鲸娘女仆动画精灵图（22 张 / 880 帧，540×540）
   whale-maid-plush-sheet/ 鲸娘女仆毛绒精灵图（22 张 / 348 帧，630×819）
   portraits/            高清立绘：whale-girl（女仆鲸娘，normal + happy）
+  blog/                 文章配图：<序号>/iNN-<原名>.avif（q60，-s 0）
 ```
 
 ## 角色形象（原版搬运，可在设置里选）
@@ -151,6 +154,28 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 `companionLimits()` 提供，`app.ts` 只记像素偏移 `state.petOffset`，帧循环里的
 `tickPetOffset()` 负责回弹。
 
+## 文章（⌘L）
+
+启动页的「文章」入口或 `⌘L` 打开文章列表：133 篇来自「书签 · NAS 与自建服务」的
+笔记，每行是序号 + 标题 + 摘要，`↑↓ / j k` 选择，`Enter` 进阅读器。
+
+- 阅读器按可用宽度重排 Markdown（标题 / 列表 / 表格 / 代码 / 引用都走同一套字符网格），
+  图片按宽度铺满、最高 40 行，滚动时按行裁剪，不会盖住页脚；
+- `j k` / `↑↓` 滚动，`PageUp/PageDown` 翻页，`g G` 首尾，`Esc` 回列表；
+- 外链图片（http/https）不画，降级成一行 `🖼 alt` 文字——跨域图片会污染 canvas，
+  之后所有 `getImageData` 都会抛 SecurityError；
+- 正文排版按「文章 id + 宽度」缓存，长文滚动不会每帧重新 parse。
+
+素材管线（源目录在仓库外，只提交生成物）：
+
+```bash
+bun run import:blog <源目录> [限制篇数]     # 图片统一 AVIF q60 · -s 0
+```
+
+图片输出到 `assets/blog/<序号>/iNN-<原名>.avif`，正文引用同步改写；GIF / WebP /
+伪扩展名（.png 实为 ico、.jpg 实为 webp）会先用 ffmpeg 转 PNG 再编码。已有输出会跳过，
+中断后重跑可续传。
+
 ## 交互
 
 | 按键 | 作用 |
@@ -158,6 +183,7 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 | `Enter` | 发送 / 确认 |
 | `Tab` | 切换 NORMAL / INSERT |
 | `⌘K` | 命令菜单（可输入过滤） |
+| `⌘L` | 文章列表（书签 · NAS 与自建服务） |
 | `⌘B` | 切换右侧面板（进工作区默认打开，首页是「♥ 伙伴」） |
 | `⌘T` / `⌘R` / `⌘E` | Todos / Jobs / 上下文 |
 | `⌘P` | 参数行 |

@@ -14,6 +14,7 @@ import type {
 import { TUI } from './tui-core.ts';
 import { UI } from './tui-ui.ts';
 import { PetKit } from './pet.ts';
+import { POSTS } from './data/posts.ts';
 
 const now = (): number => Date.now();
 
@@ -193,6 +194,9 @@ const state: AppState = {
   petDragging: false,
   petHover: false,
   petCelebrateUntil: 0,
+  postSel: 0,
+  postIndex: 0,
+  postScroll: 0,
 
   launchFocus: true,
   cwd: '~/Projects/dsh-blog',
@@ -205,6 +209,7 @@ const state: AppState = {
   ] satisfies ParamSeg[],
   actions: [
     { id: 'sessions', label: '会话与工作区' },
+    { id: 'blog', label: '文章' },
     { id: 'settings', label: '设置' },
     { id: 'kernel', label: '内核 · DSH' },
     { id: 'help', label: '帮助' },
@@ -232,6 +237,7 @@ const COMMANDS: CommandDef[] = [
   { id: 'cmdmenu', label: '⌘ 命令菜单', key: '⌘K', desc: '所有快捷指令', action: 'cmdmenu' },
   { id: 'help', label: '? 快捷键帮助', key: '?', desc: '查看按键说明', action: 'help' },
   { id: 'settings', label: '⚙ 打开设置', key: '⌘,', desc: '主题 / 宠物 / 偏好', action: 'settings' },
+  { id: 'blog', label: '✎ 文章列表', key: '⌘L', desc: '书签 · NAS 与自建服务', action: 'blog' },
   { id: 'panel-companion', label: '♥ 侧栏伙伴', key: '⌘B', desc: '侧栏宠物 / 戳一戳', action: 'panel:companion' },
   { id: 'panel-todos', label: '右侧面板 · Todos', key: '⌘T', desc: '切换待办', action: 'panel:todos' },
   { id: 'panel-jobs', label: '右侧面板 · Jobs', key: '⌘R', desc: '切换任务', action: 'panel:jobs' },
@@ -270,6 +276,18 @@ function setScreen(s: AppState['screen']): void {
   if (s === 'chat') { state.focusInput = true; setMode('insert'); }
   if (s === 'launchpad') state.launchFocus = true;
   lastActivity = now();
+}
+
+function openBlog(): void {
+  setScreen('blog');
+  state.postSel = Math.max(0, Math.min(state.postSel, POSTS.length - 1));
+}
+
+function openPost(i: number): void {
+  if (i < 0 || i >= POSTS.length) return;
+  state.postIndex = i;
+  state.postScroll = 0;
+  setScreen('post');
 }
 
 function setMode(m: AppState['mode']): void { state.mode = m; }
@@ -560,6 +578,7 @@ function dispatch(action: string | null): void {
     case 'think': toggleThink(rest); return;
     case 'poptune': paramAdjust(rest); return;
     case 'cmd': runCommand(rest); return;
+    case 'post': openPost(Number(rest)); return;
     case 'skinsel': applySkin(rest); state.overlay = null; return;
     default: break;
   }
@@ -588,6 +607,8 @@ function dispatch(action: string | null): void {
     case 'action-kernel': toggleOverlay('kernel'); break;
     case 'action-help': toggleOverlay('help'); break;
     case 'sessions': toggleOverlay('sessions'); state.sessionSel = 0; break;
+    case 'blog': openBlog(); break;
+    case 'action-blog': openBlog(); break;
     case 'theme': cycleTheme(); break;
     case 'skin': cycleSkin(); break;
     case 'skin-picker': openSkinPicker(); break;
@@ -704,6 +725,7 @@ function onKey(e: KeyboardEvent): void {
   if (e.isComposing || k === 'Process') return;
 
   if (meta && k.toLowerCase() === 'k') { toggleOverlay('cmdmenu'); state.cmdFilter = ''; state.cmdSel = 0; e.preventDefault(); return; }
+  if (meta && k.toLowerCase() === 'l') { openBlog(); e.preventDefault(); return; }
   if (meta && k === ',') { setScreen('settings'); e.preventDefault(); return; }
   if (meta && k.toLowerCase() === 'n') { newChat(); e.preventDefault(); return; }
   if (meta && k.toLowerCase() === 'j') { continueLast(); e.preventDefault(); return; }
@@ -808,6 +830,28 @@ function onKey(e: KeyboardEvent): void {
   }
   if (state.screen === 'settings') {
     if (k === 'Escape' || k === 'Enter') { setScreen('chat'); e.preventDefault(); }
+    return;
+  }
+  if (state.screen === 'blog') {
+    const last = Math.max(0, POSTS.length - 1);
+    if (k === 'Escape') { setScreen('launchpad'); e.preventDefault(); return; }
+    if (k === 'Enter') { openPost(state.postSel); e.preventDefault(); return; }
+    if (k === 'ArrowUp' || k === 'k') { state.postSel = Math.max(0, state.postSel - 1); e.preventDefault(); return; }
+    if (k === 'ArrowDown' || k === 'j') { state.postSel = Math.min(last, state.postSel + 1); e.preventDefault(); return; }
+    if (k === 'g') { state.postSel = 0; e.preventDefault(); return; }
+    if (k === 'G') { state.postSel = last; e.preventDefault(); return; }
+    if (k === 'PageUp') { state.postSel = Math.max(0, state.postSel - 10); e.preventDefault(); return; }
+    if (k === 'PageDown') { state.postSel = Math.min(last, state.postSel + 10); e.preventDefault(); return; }
+    return;
+  }
+  if (state.screen === 'post') {
+    if (k === 'Escape') { setScreen('blog'); e.preventDefault(); return; }
+    if (k === 'ArrowDown' || k === 'j') { state.postScroll += 1; e.preventDefault(); return; }
+    if (k === 'ArrowUp' || k === 'k') { state.postScroll = Math.max(0, state.postScroll - 1); e.preventDefault(); return; }
+    if (k === 'PageDown' || k === ' ') { state.postScroll += 10; e.preventDefault(); return; }
+    if (k === 'PageUp') { state.postScroll = Math.max(0, state.postScroll - 10); e.preventDefault(); return; }
+    if (k === 'g') { state.postScroll = 0; e.preventDefault(); return; }
+    if (k === 'G') { state.postScroll = 999999; e.preventDefault(); return; }
     return;
   }
 
@@ -1057,7 +1101,17 @@ function onLeave(): void {
 }
 
 function onWheel(dy: number): void {
-  if (state.screen !== 'chat' || state.overlay !== null) return;
+  if (state.overlay !== null) return;
+  if (state.screen === 'blog') {
+    const step = dy > 0 ? 1 : -1;
+    state.postSel = Math.max(0, Math.min(POSTS.length - 1, state.postSel + step));
+    return;
+  }
+  if (state.screen === 'post') {
+    state.postScroll = Math.max(0, state.postScroll + (dy > 0 ? 3 : -3));
+    return;
+  }
+  if (state.screen !== 'chat') return;
   const delta = dy > 0 ? 3 : -3;
   state.scroll = Math.max(0, state.scroll + delta);
   state.userScrolled = true;
@@ -1072,6 +1126,7 @@ function updatePet(): void {
   else if (state.petHover) mood = 'idle-look';
   else if (state.screen === 'launchpad') mood = 'idle';
   else if (state.screen === 'settings') mood = 'idle-look';
+  else if (state.screen === 'blog' || state.screen === 'post') mood = 'idle';
   else if (idleFor > 45000) mood = 'sleeping';
   else if (idleFor < 3000 && state.inputText.length === 0) mood = 'thinking';
   else mood = 'idle';

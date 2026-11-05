@@ -121,6 +121,14 @@ function parse(text: string): Block[] {
       });
       continue;
     }
+    // 独立图片行 → image 块（行内图片仍按占位符处理）
+    const im = line.match(/^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/);
+    if (im !== null && im[2] !== undefined) {
+      flushList();
+      blocks.push({ type: 'image', alt: im[1] ?? '', src: im[2] });
+      i++;
+      continue;
+    }
     // 标题
     const hm = line.match(/^(#{1,6})\s+(.*)/);
     if (hm && hm[1] !== undefined) {

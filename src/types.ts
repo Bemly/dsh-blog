@@ -31,6 +31,19 @@ export interface SpritePack {
 /** 原生像素帧的时间表：动画 key → 每帧停留时长（ms）。 */
 export type ImageTimings = Record<string, readonly number[]>;
 
+/** 博客文章（src/data/posts.ts 由 tools/import-blog.ts 生成）。 */
+export interface Post {
+  readonly id: string;
+  /** 序号（001…），列表展示与阅读器页脚用。 */
+  readonly no: string;
+  readonly title: string;
+  /** 收录日期（YYYY-MM-DD，没有则为空串）。 */
+  readonly date: string;
+  readonly excerpt: string;
+  /** Markdown 正文，图片路径已改写为 assets/blog/<no>/… */
+  readonly body: string;
+}
+
 // ── 主题 / 渲染单元 ────────────────────────────────────────
 /** 字符网格单元。 */
 export interface Cell {
@@ -291,7 +304,8 @@ export type Block =
   | { type: 'hr' }
   | { type: 'table'; head: Token[][]; rows: Token[][][] }
   | { type: 'mermaid'; lines: MermaidLine[] }
-  | { type: 'tex'; lines: string[] };
+  | { type: 'tex'; lines: string[] }
+  | { type: 'image'; alt: string; src: string };
 
 /** Markdown 解析器 API。 */
 export interface MarkdownApi {
@@ -301,7 +315,7 @@ export interface MarkdownApi {
 }
 
 // ── 应用状态 ───────────────────────────────────────────────
-export type Screen = 'onboarding' | 'launchpad' | 'settings' | 'chat';
+export type Screen = 'onboarding' | 'launchpad' | 'settings' | 'chat' | 'blog' | 'post';
 export type Overlay = 'help' | 'cmdmenu' | 'param' | 'sessions' | 'kernel' | 'cwd' | 'skin' | null;
 export type Mode = 'insert' | 'normal';
 export type ItemStatus = 'done' | 'running' | 'todo' | 'error';
@@ -417,6 +431,12 @@ export interface AppState {
   hoverId: string | null;
   /** 形象选择器里悬停的条目下标（-1 = 没有悬停，预览回落到选中项）。 */
   skinHover: number;
+  /** 文章列表选中项下标。 */
+  postSel: number;
+  /** 阅读器当前文章下标。 */
+  postIndex: number;
+  /** 阅读器滚动行数。 */
+  postScroll: number;
   panelTabs: PanelTab[];
   panelTab: string;
   panelData: PanelData;
