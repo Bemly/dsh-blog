@@ -154,17 +154,19 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 `companionLimits()` 提供，`app.ts` 只记像素偏移 `state.petOffset`，帧循环里的
 `tickPetOffset()` 负责回弹。
 
-## 文章（⌘L）
+## 书签文章（会话）
 
-启动页的「文章」入口或 `⌘L` 打开文章列表：133 篇来自「书签 · NAS 与自建服务」的
-笔记，每行是序号 + 标题 + 摘要，`↑↓ / j k` 选择，`Enter` 进阅读器。
+133 篇「书签 · NAS 与自建服务」的笔记在启动时被灌成普通会话，分组名就是
+`书签 · NAS与自建服务`——没有单独的阅读界面，选中就是现有的 TUI 对话框：
+顶栏显示标题，第一行是 system 提示「收录于 …」，正文由 assistant 消息按
+Markdown 逐块渲染，配图就地铺在消息流里。
 
-- 阅读器按可用宽度重排 Markdown（标题 / 列表 / 表格 / 代码 / 引用都走同一套字符网格），
-  图片按宽度铺满、最高 40 行，滚动时按行裁剪，不会盖住页脚；
-- `j k` / `↑↓` 滚动，`PageUp/PageDown` 翻页，`g G` 首尾，`Esc` 回列表；
-- 外链图片（http/https）不画，降级成一行 `🖼 alt` 文字——跨域图片会污染 canvas，
-  之后所有 `getImageData` 都会抛 SecurityError；
-- 正文排版按「文章 id + 宽度」缓存，长文滚动不会每帧重新 parse。
+- 入口：`⌘J` 继续最近，或 `⌘K` →「会话与工作区」/ 启动页「会话与工作区」；
+- 会话列表支持 `↑↓ / j k`、`PageUp/PageDown`、`Home/End`、鼠标滚轮，选中 `Enter` 打开；
+- 正文首行重复的 `# 标题` 在灌入时去掉，避免和顶栏重复；
+- 图片按消息区宽度铺满、最高 40 行，滚动时按行裁剪；外链图（http/https）降级成
+  `🖼 alt` 文字——跨域图会污染 canvas，之后所有 `getImageData` 都会抛 SecurityError；
+- Markdown 解析结果按内容缓存（最近 6 条），图片懒加载后请求重绘。
 
 素材管线（源目录在仓库外，只提交生成物）：
 
@@ -173,9 +175,10 @@ bun run import:blog <源目录> [限制篇数]     # 图片统一 AVIF q60 · -s
 ```
 
 图片输出到 `assets/blog/<序号>/iNN-<原名>.avif`，正文引用同步改写；GIF / WebP /
-伪扩展名（.png 实为 ico、.jpg 实为 webp）会先用 ffmpeg 转 PNG 再编码。已有输出会跳过，
-中断后重跑可续传。
+伪扩展名（.png 实为 ico、.jpg 实为 webp）会先用 ffmpeg 转 PNG 再编码；「内容由 AI
+生成」的免责声明行在导入时剔除。已有输出会跳过，中断后重跑可续传。
 
+## 交互
 ## 交互
 
 | 按键 | 作用 |
@@ -183,7 +186,6 @@ bun run import:blog <源目录> [限制篇数]     # 图片统一 AVIF q60 · -s
 | `Enter` | 发送 / 确认 |
 | `Tab` | 切换 NORMAL / INSERT |
 | `⌘K` | 命令菜单（可输入过滤） |
-| `⌘L` | 文章列表（书签 · NAS 与自建服务） |
 | `⌘B` | 切换右侧面板（进工作区默认打开，首页是「♥ 伙伴」） |
 | `⌘T` / `⌘R` / `⌘E` | Todos / Jobs / 上下文 |
 | `⌘P` | 参数行 |

@@ -81,9 +81,11 @@ src/data/timings.ts                     # anim-key → 每帧时长数组（ms�
   否则非整数倍缩放会锯齿；
 - alpha 档位：像素画 60 够用，软边插画要 85 起步，60 会有明显脏边。
 
-## 博客文章（`⌘L`）
+## 书签文章（灌成会话）
 
-文章来自仓库外的 Obsidian 目录（书签 · NAS 与自建服务），只提交生成物：
+文章来自仓库外的 Obsidian 目录（书签 · NAS 与自建服务），启动时由 `app.ts` 的
+`seedPosts()` 灌成普通会话（分组「书签 · NAS与自建服务」）——**不要再为它单独写屏幕**，
+正文就走 `assistant` 消息的 Markdown 渲染。只提交生成物：
 
 ```bash
 bun run import:blog <源目录> [限制篇数]     # 断点续传：已有 .avif 会跳过
@@ -93,8 +95,9 @@ bun run import:blog <源目录> [限制篇数]     # 断点续传：已有 .avif
 - 图片统一 `avifenc -q 60 --qalpha 60 -s 0`；GIF / WebP / 伪扩展名先经 ffmpeg 转 PNG，
   PNG/JPEG 直接编码，失败再回退转码；
 - `posts.ts` 与 `assets/blog/` 都是生成物，**不要手改**，要改就改导入脚本再重跑；
-- 阅读器只画 `assets/` 下的图：跨域图会污染 canvas，导致整个像素层 `getImageData` 抛异常；
-- 排版结果按「文章 id + 宽度」缓存，正文解析不能放进每帧循环。
+- 「内容由 AI 生成」的免责声明行在导入时剔除，别让它出现在正文里；
+- 消息里只画 `assets/` 下的图：跨域图会污染 canvas，导致整个像素层 `getImageData` 抛异常；
+- Markdown 解析结果按内容缓存（最近 6 条），正文解析不能每次绘制都重跑。
 
 ## 验证清单
 

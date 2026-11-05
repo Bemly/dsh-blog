@@ -315,7 +315,7 @@ export interface MarkdownApi {
 }
 
 // ── 应用状态 ───────────────────────────────────────────────
-export type Screen = 'onboarding' | 'launchpad' | 'settings' | 'chat' | 'blog' | 'post';
+export type Screen = 'onboarding' | 'launchpad' | 'settings' | 'chat';
 export type Overlay = 'help' | 'cmdmenu' | 'param' | 'sessions' | 'kernel' | 'cwd' | 'skin' | null;
 export type Mode = 'insert' | 'normal';
 export type ItemStatus = 'done' | 'running' | 'todo' | 'error';
@@ -431,12 +431,6 @@ export interface AppState {
   hoverId: string | null;
   /** 形象选择器里悬停的条目下标（-1 = 没有悬停，预览回落到选中项）。 */
   skinHover: number;
-  /** 文章列表选中项下标。 */
-  postSel: number;
-  /** 阅读器当前文章下标。 */
-  postIndex: number;
-  /** 阅读器滚动行数。 */
-  postScroll: number;
   panelTabs: PanelTab[];
   panelTab: string;
   panelData: PanelData;

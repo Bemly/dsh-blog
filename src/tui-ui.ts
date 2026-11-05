@@ -9,14 +9,14 @@
    命中：每帧把可点击区 push 到 App._hits，鼠标由 App 分发。
    ═══════════════════════════════════════════════════════════ */
 import type {
-  AppApi, Block, CommandDef, Hit, PetDragLimits, PetRect, PixelLayerApi, Post,
+  AppApi, Block, CommandDef, Hit, PetDragLimits, PetRect, PixelLayerApi,
   RenderToken, SkinDef, Token,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { PixelLayer } from './pixel-layer.ts';
 import { MDKit } from './markdown.ts';
 import { PetKit } from './pet.ts';
-import { POSTS, POST_IMAGE_SIZE } from './data/posts.ts';
+import { POST_IMAGE_SIZE } from './data/posts.ts';
 
 const T = (): typeof TUI.THEME => TUI.THEME;
 const ST = TUI.ST;
@@ -543,7 +543,15 @@ function drawMessages(): void {
   for (let i = scroll; i < lines.length && i - scroll < visible; i++) {
     const ln = lines[i];
     if (ln === undefined || ln.kind === 'gap') continue;
-    drawLine(area.x, area.y + (i - scroll), area.w, ln);
+    const y = area.y + (i - scroll);
+    let out = ln;
+    if (ln.kind === 'image') {
+      // 图片跨到输入框/页脚时按可见行裁剪
+      const avail = area.y + area.h - y;
+      if (avail <= 0) continue;
+      if (ln.rows > avail) out = { ...ln, rows: avail };
+    }
+    drawLine(area.x, y, area.w, out);
   }
   // 滚动条（原版 ScrollbarGutter）
   if (maxScroll > 0) {
@@ -627,6 +635,21 @@ function drawLine(x: number, y: number, w: number, ln: Line): void {
   }
 }
 
+/** Markdown 解析缓存：长文章消息不每帧重 parse（保留最近 6 条）。 */
+const blockCache = new Map<string, Block[]>();
+
+function blocksOf(content: string): Block[] {
+  const hit = blockCache.get(content);
+  if (hit !== undefined) return hit;
+  const blocks = MDKit.parse(content);
+  blockCache.set(content, blocks);
+  if (blockCache.size > 6) {
+    const first = blockCache.keys().next().value;
+    if (first !== undefined) blockCache.delete(first);
+  }
+  return blocks;
+}
+
 /** 文章图片懒加载（加载完请求重绘）。 */
 const postImages: Record<string, HTMLImageElement> = Object.create(null) as Record<string, HTMLImageElement>;
 
@@ -698,7 +721,7 @@ function layoutMessage(m: import('./types.ts').Message, width: number, lines: Li
       return;
     case 'assistant': {
       const content = streamAcc ?? m.content;
-      for (const b of MDKit.parse(content)) layoutBlock(b, width, lines);
+      for (const b of blocksOf(content)) layoutBlock(b, width, lines);
       return;
     }
   }
@@ -1110,11 +1133,17 @@ function drawSessions(): void {
   modalBox(x, y, bw, bh, ' 会话与工作区 ');
   TUI.text(x + 2, y + 2, `工作区  ${app.state.cwd}:${app.state.branch}`, T().dim);
   TUI.hline(x + 2, y + 3, bw - 4, T().border);
+  const per = Math.max(1, bh - 6);
+  const sel = Math.max(0, Math.min(app.state.sessionSel, ids.length - 1));
+  const start = Math.max(0, Math.min(sel - per + 1, Math.max(0, ids.length - per)));
   let row = y + 4;
-  ids.forEach((id, i) => {
+  for (let k = 0; k < per && start + k < ids.length; k++) {
+    const i = start + k;
+    const id = ids[i];
+    if (id === undefined) break;
     const s = app.state.sessions[id];
     const name = s?.title ?? id;
-    const isSel = i === app.state.sessionSel;
+    const isSel = i === sel;
     const active = app.state.groups.some(g => g.sessions.some(x => x.id === id && x.active));
     const fg = isSel ? T().suggestion : T().fg;
     const st = isSel ? ST.BOLD : 0;
@@ -1122,8 +1151,10 @@ function drawSessions(): void {
     TUI.text(x + 3, row, `${active ? '● ' : '  '}${clipLine(name, bw - 12)}`, fg, isSel ? T().accentDim : '', st);
     hit('switch', x + 2, row, bw - 4, 1, `switch:${id}`, name);
     row++;
-  });
+  }
+  const pos = `${sel + 1}/${ids.length}`;
   TUI.text(x + 2, y + bh - 2, '↑↓ 选择 · Enter 打开 · Esc 关闭', T().dim);
+  TUI.text(x + bw - 3 - W(pos), y + bh - 2, pos, T().dim);
 }
 
 // ── 弹层：内核 ─────────────────────────────────────────────
@@ -1378,113 +1409,6 @@ function drawSkinPreview(): void {
   );
 }
 
-// ── 文章：列表 + 阅读器 ─────────────────────────────────────
-const POST_ROW_H = 2;
-
-/** 越界安全的取文章（数组下标在 strict 下不返回 undefined）。 */
-function postAt(i: number): Post | undefined {
-  return POSTS[i] as Post | undefined;
-}
-
-/** 阅读器排版缓存：正文几百 KB，不能每帧重排。 */
-const postLayouts: Record<string, { width: number; lines: Line[] }> = Object.create(null) as Record<string, { width: number; lines: Line[] }>;
-
-function postLines(p: Post, width: number): Line[] {
-  const cached = postLayouts[p.id];
-  if (cached !== undefined && cached.width === width) return cached.lines;
-  const lines: Line[] = [];
-  const blocks = MDKit.parse(p.body);
-  if (blocks[0]?.type === 'h' && blocks[0].level === 1) blocks.shift();
-  for (const b of blocks) layoutBlock(b, width, lines);
-  postLayouts[p.id] = { width, lines };
-  return lines;
-}
-
-function drawBlog(): void {
-  if (App === null) return;
-  TUI.fill(0, 0, TUI.COLS, TUI.ROWS, { bg: T().bg });
-  TUI.fill(0, 0, TUI.COLS, 1, { bg: T().panel });
-  TUI.text(1, 0, '✦', T().accent, T().panel, ST.BOLD);
-  TUI.text(3, 0, 'dsh-blog · 文章', T().dim, T().panel);
-  const right = '共 ' + POSTS.length + ' 篇 · Esc 返回';
-  TUI.text(TUI.COLS - 1 - W(right), 0, right, T().dim, T().panel);
-  TUI.hline(0, 1, TUI.COLS, T().border);
-
-  const margin = 2;
-  const w = TUI.COLS - margin * 2;
-  const top = 2;
-  const listH = Math.max(2, TUI.ROWS - top - 2);
-  const per = Math.max(1, Math.floor(listH / POST_ROW_H));
-  const sel = Math.max(0, Math.min(App.state.postSel, POSTS.length - 1));
-  const start = Math.max(0, Math.min(sel - per + 1, Math.max(0, POSTS.length - per)));
-  for (let i = start; i < Math.min(POSTS.length, start + per); i++) {
-    const p = postAt(i);
-    if (p === undefined) continue;
-    const y = top + (i - start) * POST_ROW_H;
-    const isSel = i === sel;
-    const bg = isSel ? T().accentDim : '';
-    if (isSel) TUI.fill(margin, y, w, POST_ROW_H, { bg });
-    TUI.text(margin + 1, y, p.no, isSel ? '#eef2fa' : T().accentDim, bg, ST.BOLD);
-    TUI.text(margin + 5, y, clipLine(p.title, w - 8), isSel ? '#eef2fa' : T().fg, bg, isSel ? ST.BOLD : 0);
-    TUI.text(margin + 5, y + 1, clipLine(p.excerpt, w - 8), isSel ? '#cfe0f5' : T().dim, bg);
-    hit('post-row:' + p.id, margin, y, w, POST_ROW_H, 'post:' + i, p.title);
-  }
-  TUI.text(margin, TUI.ROWS - 1, '↑↓ / j k 选择 · Enter 阅读 · Esc 返回', T().dim);
-}
-
-function drawPost(): void {
-  if (App === null) return;
-  const p = postAt(App.state.postIndex);
-  TUI.fill(0, 0, TUI.COLS, TUI.ROWS, { bg: T().bg });
-  TUI.fill(0, 0, TUI.COLS, 1, { bg: T().panel });
-  TUI.text(1, 0, '✦', T().accent, T().panel, ST.BOLD);
-  TUI.text(3, 0, 'dsh-blog · 阅读', T().dim, T().panel);
-  if (p === undefined) {
-    TUI.text(2, 3, '没有这篇文章', T().dim);
-    return;
-  }
-  const idx = App.state.postIndex + 1;
-  const meta = p.no + ' · ' + (p.date || '未收录日期') + ' · ' + idx + '/' + POSTS.length;
-  const back = 'Esc 返回';
-  TUI.text(TUI.COLS - 1 - W(back), 0, back, T().dim, T().panel);
-  TUI.text(TUI.COLS - 3 - W(back) - W(meta), 0, meta, T().dim, T().panel);
-  TUI.hline(0, 1, TUI.COLS, T().border);
-  TUI.text(2, 2, clipLine(p.title, TUI.COLS - 6), T().fg, undefined, ST.BOLD);
-
-  const margin = 2;
-  const width = TUI.COLS - margin * 2;
-  const lines = postLines(p, width);
-
-  const top = 4;
-  const visible = Math.max(2, TUI.ROWS - top - 1);
-  const maxScroll = Math.max(0, lines.length - visible);
-  const scroll = Math.max(0, Math.min(App.state.postScroll, maxScroll));
-  App.state.postScroll = scroll;
-  for (let i = scroll; i < lines.length && i - scroll < visible; i++) {
-    const ln = lines[i];
-    if (ln === undefined || ln.kind === 'gap') continue;
-    const y = top + (i - scroll);
-    let out = ln;
-    if (ln.kind === 'image') {
-      // 底部裁到页脚之上，避免图片盖住状态行
-      const avail = TUI.ROWS - 1 - y;
-      if (avail <= 0) continue;
-      if (ln.rows > avail) out = { ...ln, rows: avail };
-    }
-    drawLine(margin, y, width, out);
-  }
-  if (maxScroll > 0) {
-    const trackX = TUI.COLS - 1;
-    const thumbH = Math.max(1, Math.round(visible * visible / lines.length));
-    const thumbY = top + Math.round((visible - thumbH) * (scroll / maxScroll));
-    TUI.fill(trackX, top, 1, visible, { bg: T().panel2 });
-    TUI.fill(trackX, thumbY, 1, thumbH, { bg: T().dim });
-  }
-  TUI.text(margin, TUI.ROWS - 1, 'j k / ↑↓ 滚动 · g G 首尾 · Esc 返回列表', T().dim);
-  const pos = Math.min(lines.length, scroll + 1);
-  TUI.text(TUI.COLS - 3 - W(String(pos) + '/' + lines.length), TUI.ROWS - 1, pos + '/' + lines.length, T().dim);
-}
-
 // ── 主帧 ───────────────────────────────────────────────────
 function drawAll(): void {
   PixelLayer.begin();
@@ -1498,8 +1422,6 @@ function drawAll(): void {
   if (sc === 'onboarding') drawOnboarding();
   else if (sc === 'launchpad') drawLaunchpad();
   else if (sc === 'settings') drawSettings();
-  else if (sc === 'blog') drawBlog();
-  else if (sc === 'post') drawPost();
   else if (sc === 'chat') {
     drawHead();
     drawMessages();

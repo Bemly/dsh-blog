@@ -58,7 +58,10 @@ function readPosts(): RawPost[] {
     .sort((a, b) => a.localeCompare(b, 'en'));
   const picked = limit > 0 ? files.slice(0, limit) : files;
   return picked.map((file, index) => {
-    const body = readFileSync(join(srcDir, file), 'utf8').replace(/\r\n/g, '\n');
+    const body = readFileSync(join(srcDir, file), 'utf8')
+      .replace(/\r\n/g, '\n')
+      // 去掉「内容由AI生成」的免责声明行
+      .replace(/^.*内容由\s*AI\s*生成.*$\n?/gm, '');
     // 用整体序号做 id / 目录：源文件前缀会重复（002-01、002-02 都属于 002）
     const no = String(index + 1).padStart(3, '0');
     const h1 = body.match(/^#\s+(.+)$/m);
