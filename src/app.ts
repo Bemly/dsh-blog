@@ -61,8 +61,6 @@ const SKINS: SkinDef[] = [
   { id: 'whale-maid', label: '鲸娘 · 女仆 Q版', kind: '插画序列帧', desc: '22 个动画 / 384 帧 · 489×709' },
   { id: 'whale-maid-anime', label: '鲸娘 · 女仆 动画', kind: '插画序列帧', desc: '22 个动画 / 880 帧 · 540×540' },
   { id: 'whale-maid-plush', label: '鲸娘 · 女仆 毛绒', kind: '插画序列帧', desc: '22 个动画 / 348 帧 · 630×819' },
-  { id: 'deepy', label: 'deepy', kind: '字符动画', desc: '42×30 · 20 个动画' },
-  { id: 'whale', label: '小鲸鱼', kind: '字符动画', desc: '40×25 · 22 帧开屏鲸鱼' },
 ];
 
 const TIPS: readonly string[] = [
@@ -116,9 +114,8 @@ const state: AppState = {
     ],
     jobs: [
       { type: 'head', text: '后台任务' },
-      { type: 'item', text: 'deepy 动画打包', status: 'done' },
       { type: 'item', text: 'whalegirl 图像帧', status: 'done' },
-      { type: 'item', text: 'whale 开屏序列', status: 'running' },
+      { type: 'item', text: '插画序列帧编码', status: 'running' },
       { type: 'item', text: 'claude-girl 精灵图', status: 'done' },
       { type: 'hr' },
       { type: 'item', text: 'Canvas 帧循环调优', status: 'todo' },
@@ -243,7 +240,7 @@ const COMMANDS: CommandDef[] = [
   { id: 'panel-themes', label: '右侧面板 · Themes', key: '', desc: '切换主题预览', action: 'panel:themes' },
   { id: 'param', label: '⚙ 参数行', key: '⌘P', desc: '调整模型参数', action: 'param' },
   { id: 'theme', label: '◐ 切换主题', key: '', desc: '深色 / 浅色', action: 'theme' },
-  { id: 'skin', label: '✿ 切换宠物形象', key: '', desc: '鲸娘 / Claude 娘 / Codex 娘 / deepy / 小鲸鱼', action: 'skin-picker' },
+  { id: 'skin', label: '✿ 切换宠物形象', key: '', desc: '鲸娘 / Claude 娘 / Codex 娘 / 女仆鲸娘', action: 'skin-picker' },
   { id: 'model', label: '◎ 切换模型', key: '', desc: '循环默认模型', action: 'model' },
   { id: 'streaming', label: '⇶ 流式输出', key: '', desc: '开 / 关', action: 'tog-streaming' },
   { id: 'autoscroll', label: '⇣ 自动滚动', key: '', desc: '开 / 关', action: 'tog-autoscroll' },
@@ -314,7 +311,7 @@ function buildSeed(): void {
     id: 's1', title: 'Canvas 真 TUI 重构', time: today, messages: [
       { type: 'system', content: `会话已恢复 · ${dateLabel(today)}` },
       { type: 'user', content: '把 dsh-blog 重写成 Canvas 真 TUI，保留全部 UI 与交互，并把所有像素宠物都搬进来。' },
-      { type: 'think', content: '目标拆解：\n1) 渲染架构：字符网格 buffer + 半块像素精灵，Canvas 逐帧绘制\n2) 宠物盘点：assets/deepy + whaleGirl + 各 sprite，全部打包为 script 数据\n3) 交互映射：键盘 / 鼠标命中分发到 UI action', open: true, id: 't1' },
+      { type: 'think', content: '目标拆解：\n1) 渲染架构：字符网格 buffer + 半块像素精灵，Canvas 逐帧绘制\n2) 宠物盘点：whaleGirl 精灵图 + 女仆系列插画，全部打包为 script 数据\n3) 交互映射：键盘 / 鼠标命中分发到 UI action', open: true, id: 't1' },
       { type: 'tool', tool: { name: 'read_file', status: 'done', statusText: 'tui-core.ts 441 行', body: '像素层 / 字符网格双轨确认\nCOLS / ROWS 自适应，全角字符占宽' } },
       { type: 'assistant', content: '## 渲染架构设计\n\nCanvas 唯一渲染载体，所有界面元素逐帧绘制：\n\n- **字符网格 buffer**：每个单元存 `{ch, fg, bg, st}`\n- **布局系统**：head / main / composer / status\n- **命中系统**：每帧把可点击区 push 到 `_hits`，鼠标按字符坐标分发\n\n```ts\nTUI.rich(x, y, tokens, fg);          // 富文本排版\nPixelLayer.cells(x, y, cw, ch, rows, palette); // 真像素精灵\n```\n\n> 关键：全部像素宠物共用 `PetKit` 引擎，按 `MOOD_ANIM` 状态机播放。\n\n| 区域 | 职责 |\n|---|---|\n| 顶栏 | 标题 / 模型 / 按钮 |\n| 主区 | 流式 Markdown |\n| 面板 | Todos / Jobs / Context |' },
       { type: 'usage', content: 'context: 12.8k/128k tokens' },
@@ -352,7 +349,7 @@ function buildSeed(): void {
 // ── 流式模拟 ───────────────────────────────────────────────
 const REPLY_POOL: readonly string[] = [
   '## 完成情况\n\nCanvas 真 TUI 架构已落地：\n\n- 帧循环 + 输入映射 + 布局系统全部就绪\n- 6 个像素形象完整移植\n\n```ts\n// 宠物统一驱动\npet.renderTo(PixelLayer, x, y, w, h);\n```\n\n> 浏览器直接打开 index.html 即可运行。',
-  '## 宠物清单\n\n盘点 dsh-TUI 全部像素角色：\n\n1. **鲸娘 · 动画** — 22 个动画（原生像素帧）\n2. **鲸娘 · 女仆 / Claude 娘 / Codex 娘** — 高清立绘\n3. **deepy** — 20 个动画\n4. **小鲸鱼** — 22 帧开屏鲸鱼\n\n| 皮肤 | 数据源 |\n|---|---|\n| whalegirl | assets/whalegirl |\n| portraits | assets/portraits |',
+  '## 宠物清单\n\n盘点 dsh-TUI 全部像素角色：\n\n1. **鲸娘 · 动画** — 22 个动画（原生像素帧）\n2. **Claude 娘 / Codex 娘** — 原生像素帧精灵图\n3. **鲸娘 · 女仆** — 高清立绘 / 插画序列帧\n\n| 皮肤 | 数据源 |\n|---|---|\n| whalegirl | assets/whalegirl |\n| portraits | assets/portraits |',
   '## 交互提示\n\n- 点击启动页立绘可互动（poke / happy）\n- ⌘K 打开命令菜单，⌘B / ⌘P 切换面板与参数\n- 设置页可切换 6 个形象\n\n```\nNORMAL / INSERT 模式\nTab 切换 · Enter 发送\n```',
   '## 后续建议\n\n已满足核心要求，可继续扩展：\n\n- [x] 全部形象移植\n- [x] Canvas 逐帧渲染\n- [ ] 真实模型接入\n- [ ] 会话持久化',
 ];

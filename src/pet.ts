@@ -9,24 +9,19 @@
                    缺图/未加载时回落 42×30 字符格帧包
    - claude-girl / codex-girl / whale-maid* : 插画 / 像素精灵图（同一套 SheetArt 轨道）
    - maid-girl   : 高清立绘（normal + happy）
-   - deepy       : 42×30 字符动画 ×20
-   - whale       : 开屏鲸鱼 40×25 ×22 帧
 
    交互（启动页 / 侧栏共用）：
    - 稳态 idle 循环；
    - 点击 → 从该形象全部动画（约 20 个）里随机挑一个完整播一轮；
    - 900ms 内连点 ≥3 次 → tickle；
-   - 开屏鲸鱼只有帧序列，回落到左/右 poke；
    - 高清立绘点击 → happy 变体 3s。
    ═══════════════════════════════════════════════════════════ */
 import type {
   AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi,
-  PortraitArt, SheetArt, SheetFrame, SkinId, WhaleFrame,
+  PortraitArt, SheetArt, SheetFrame, SkinId,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
-import { DEEPY } from './data/deepy.ts';
 import { WHALEGIRL } from './data/whalegirl.ts';
-import { WHALE_FRAMES } from './data/whale.ts';
 import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, MAID_ANIME_IMG, MAID_IMG, PLUSH_IMG, WHALEGIRL_IMG } from './data/timings.ts';
 
 /** 精灵图单格尺寸（像素画统一 301×288）。 */
@@ -43,9 +38,6 @@ const SHEETS: Record<string, SheetArt> = {
   'whale-maid-plush': { dir: 'assets/whale-maid-plush-sheet/', cell: [630, 819], timings: PLUSH_IMG, smooth: true },
 };
 const PT_DIR = 'assets/portraits/';
-const SPLASH_PALETTE: Record<string, string> = {
-  D: '#142660', B: '#4E6FFF', L: '#BEE1FF', W: '#FFFFFF', H: '#CC3399', Z: '#808080',
-};
 
 /** 高清立绘（真图）：只剩女仆鲸娘——她没有动画帧，保持静态 */
 const PORTRAITS: Record<string, PortraitArt> = {
@@ -70,7 +62,6 @@ const ANIM_LABEL: Record<string, string> = {
 };
 
 // 原版启动页常量（dsh-TUI SplashMascot / mood.ts）
-const SPLASH_POKE_MS = 1400;
 const TICKLE_WINDOW_MS = 900;
 const TICKLE_MIN_CLICKS = 3;
 /** 点击反应池的排除项：静止态与拖拽姿态（拖拽由 hold 控制）。 */
@@ -92,8 +83,6 @@ function pack(skin: SkinId): PetPack {
       : { size: [sheet.cell[0], sheet.cell[1]] as [number, number] };
     return { type: 'sheet', sheet, ...fallback };
   }
-  if (skin === 'deepy') return { type: 'anim', palette: DEEPY.palette, anims: DEEPY.animations, size: DEEPY.size };
-  if (skin === 'whale') return { type: 'whale', palette: SPLASH_PALETTE, frames: WHALE_FRAMES, size: [40, 25] };
   return { type: 'none', size: [0, 0] };
 }
 
@@ -184,10 +173,6 @@ function portraitImage(key: string, which: 'normal' | 'happy'): PortraitRec | nu
   return rec;
 }
 
-function frameByName(frames: readonly WhaleFrame[], name: string): WhaleFrame | undefined {
-  return frames.find(f => f.name === name) ?? frames[0];
-}
-
 // ── 播放器 ─────────────────────────────────────────────────
 interface AnimBankEntry {
   frames: AnimFrame[];
@@ -212,18 +197,13 @@ export class Player implements Pet {
   private happyUntil = 0;
   private clicks: number[] = [];
   private portraitKey = '';
-  private whaleSeq: { name: string; dur: number }[] = [];
-  private whaleSeqStart = 0;
-  private whalePhase = 0;
-  private whaleLastBlink = 0;
-  private heartStart = 0;
   private sheet: SheetArt | null;
 
   constructor(skin: SkinId) {
     this.skin = skin;
     this.pack = pack(skin);
     this.sheet = this.pack.sheet ?? null;
-    if (this.pack.type === 'anim' || this.pack.type === 'sheet') {
+    if (this.pack.type === 'sheet') {
       for (const a of this.pack.anims ?? []) {
         this.anims[a.key] = { frames: a.frames, total: a.frames.reduce((s, f) => s + f.dur, 0) };
       }
@@ -234,11 +214,6 @@ export class Player implements Pet {
         if (PORTRAITS[key] === this.pack.art) { this.portraitKey = key; break; }
       }
       portraitImage(this.portraitKey, 'normal');
-    }
-    if (this.pack.type === 'whale') {
-      const seq = ['spout3', 'spout5', 'spout1', 'spout6', 'standard', 'tail2', 'tail4', 'standard'];
-      this.whaleSeq = seq.map(n => ({ name: n, dur: 240 }));
-      this.whaleSeq[this.whaleSeq.length - 1] = { name: 'standard', dur: 5000 };
     }
   }
 
@@ -254,24 +229,19 @@ export class Player implements Pet {
       }
       return;
     }
-    if (this.pack.type === 'anim' && this.anims[key] !== undefined && this.animKey !== key) {
-      this.animKey = key;
-      this.animStart = this.time;
-    }
   }
 
   /**
    * 点击反应：从当前素材的全部动画里随机挑一个完整播一轮（20 个左右），
-   * 900ms 内连点 ≥3 次仍保留 tickle；立绘走 happy 变体；
-   * 只有帧序列的开屏鲸鱼没有动画表，回落到左/右 poke。
+   * 900ms 内连点 ≥3 次仍保留 tickle；立绘走 happy 变体。
    */
-  click(fracX: number): void {
+  click(_fracX: number): void {
     if (this.pack.type === 'portrait') {
       this.happyUntil = this.time + HAPPY_MS;
       portraitImage(this.portraitKey, 'happy');
       return;
     }
-    if (this.pack.type !== 'anim' && this.pack.type !== 'sheet' && this.pack.type !== 'whale') return;
+    if (this.pack.type !== 'sheet') return;
     const t = this.time;
     this.clicks = this.clicks.filter(x => x > t - TICKLE_WINDOW_MS);
     this.clicks.push(t);
@@ -281,23 +251,16 @@ export class Player implements Pet {
       this.override = { key: 'tickle', start: t, until: t + TICKLE_WINDOW_MS };
     } else {
       const pool = this.reactionPool();
-      if (pool.length === 0) {
-        this.override = { key: fracX < 0.5 ? 'poke-left' : 'poke-right', start: t, until: t + SPLASH_POKE_MS };
-      } else {
-        const key = pool[Math.floor(Math.random() * pool.length)] ?? 'idle';
-        const dur = Math.max(REACTION_MIN_MS, Math.min(REACTION_MAX_MS, this.keyDuration(key)));
-        this.override = { key, start: t, until: t + dur };
-      }
+      const key = pool[Math.floor(Math.random() * pool.length)] ?? 'idle';
+      const dur = Math.max(REACTION_MIN_MS, Math.min(REACTION_MAX_MS, this.keyDuration(key)));
+      this.override = { key, start: t, until: t + dur };
     }
     if (this.sheet !== null && this.override !== null) imageAnim(this.sheet, this.override.key);
   }
 
   /** 可随机触发的动作：去掉静止 idle 与拖拽 drag。 */
   private reactionPool(): string[] {
-    const src = this.sheet !== null
-      ? Object.keys(this.sheet.timings)
-      : (this.pack.type === 'anim' ? Object.keys(this.anims) : []);
-    return src.filter(k => !CLICK_EXCLUDE.has(k));
+    return Object.keys(this.sheet?.timings ?? {}).filter(k => !CLICK_EXCLUDE.has(k));
   }
 
   /** 一个动作完整播一轮的时长（ms）。 */
@@ -345,7 +308,7 @@ export class Player implements Pet {
   /** 当前帧的字符格 rows（仅鲸娘有字符回退包；其余精灵图形象未就绪时返回 null）。 */
   frameRows(): string[] | null {
     const pk = this.pack;
-    if (pk.type === 'anim' || pk.type === 'sheet') {
+    if (pk.type === 'sheet') {
       const key = this.currentKey();
       const a = this.anims[key] ?? this.anims.idle ?? this.anims[Object.keys(this.anims)[0] ?? ''];
       if (a === undefined) return null;
@@ -357,47 +320,6 @@ export class Player implements Pet {
       }
       const last = a.frames[a.frames.length - 1];
       return last !== undefined ? last.rows : null;
-    }
-    if (pk.type === 'whale') {
-      const frames = pk.frames ?? [];
-      const standard = frameByName(frames, 'standard');
-      if (this.whalePhase === -1) {
-        const dt = this.time - this.heartStart;
-        const seq = ['heart1', 'heart2', 'heart3', 'heart2', 'heart1'];
-        const idx = Math.min(seq.length - 1, Math.floor(dt / 200));
-        if (dt > 1100) {
-          this.whalePhase = 0;
-          this.whaleSeqStart = this.time;
-          this.whaleLastBlink = this.time;
-          return standard?.rows ?? null;
-        }
-        return frameByName(frames, seq[idx] ?? 'standard')?.rows ?? null;
-      }
-      if (this.whalePhase === 0) {
-        const dt = this.time - this.whaleSeqStart;
-        let acc = 0;
-        for (let i = 0; i < this.whaleSeq.length; i++) {
-          const step = this.whaleSeq[i];
-          if (step === undefined) continue;
-          acc += step.dur;
-          if (dt < acc) {
-            if (i === this.whaleSeq.length - 1) {
-              this.whalePhase = 1;
-              this.whaleLastBlink = this.time;
-            }
-            return frameByName(frames, step.name)?.rows ?? null;
-          }
-        }
-        this.whalePhase = 1;
-        this.whaleLastBlink = this.time;
-        return standard?.rows ?? null;
-      }
-      if (this.time - this.whaleLastBlink > 3800) {
-        const bdt = this.time - this.whaleLastBlink;
-        if (bdt < 340) return frameByName(frames, 'blink')?.rows ?? null;
-        this.whaleLastBlink = this.time;
-      }
-      return standard?.rows ?? null;
     }
     return null;
   }
@@ -463,7 +385,7 @@ export class Player implements Pet {
         return;
       }
     }
-    if (pk.type === 'anim' || pk.type === 'sheet' || pk.type === 'whale') {
+    if (pk.type === 'sheet') {
       const rows = this.frameRows();
       if (rows === null || rows.length === 0) return;
       const cw0 = TUI.cw;

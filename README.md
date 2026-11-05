@@ -50,10 +50,8 @@ src/
   pet.ts                像素宠物引擎：原版素材 + 原版启动页交互
   markdown.ts           轻量 Markdown → 判别联合 Block[]（mermaid / LaTeX 简化）
   data/
-    whalegirl.ts        鲸娘 42×30 字符格帧包
-    deepy.ts            deepy 42×30 动画
-    whale.ts            开屏鲸鱼 40×25 帧
-    timings.ts          三个角色的逐帧时长表（ms）
+    whalegirl.ts        鲸娘 42×30 字符格帧包（精灵图未就绪时回落）
+    timings.ts          各角色逐帧时长表（ms）
 assets/
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
   claude-girl-sheet/    Claude 娘 AVIF 精灵图（22 张 / 225 帧）
@@ -66,7 +64,7 @@ assets/
 
 ## 角色形象（原版搬运，可在设置里选）
 
-`src/app.ts` 的 `SKINS` 名册 = 9 个形象（像素画 3 + 插画 3 + 立绘 1 + 字符动画 2）：
+`src/app.ts` 的 `SKINS` 名册 = 7 个形象（像素画 3 + 插画 3 + 立绘 1）：
 
 | id | 名称 | 形态 | 素材 |
 |---|---|---|---|
@@ -77,8 +75,6 @@ assets/
 | `whale-maid` | 鲸娘 · 女仆 Q版 | 插画序列帧 22 动画 / 384 帧（489×709） | `assets/whale-maid-sheet/` |
 | `whale-maid-anime` | 鲸娘 · 女仆 动画 | 插画序列帧 22 动画 / 880 帧（540×540，源 720 缩 0.75） | `assets/whale-maid-anime-sheet/` |
 | `whale-maid-plush` | 鲸娘 · 女仆 毛绒 | 插画序列帧 22 动画 / 348 帧（630×819，源 964×1252 缩 0.654） | `assets/whale-maid-plush-sheet/` |
-| `deepy` | deepy | 42×30 字符动画 ×20 | `src/data/deepy.ts` |
-| `whale` | 小鲸鱼 | 40×25 字符帧 ×22 | `src/data/whale.ts` |
 
 - 选择入口：`⌘K` →「切换宠物形象」，或设置页「宠物形象 skin」→ 弹层选择器
   （左侧名册 + 右侧实时预览，`↑↓` 选、`Enter` 应用、`Esc` 关闭）；
@@ -86,7 +82,7 @@ assets/
   点一下预览会随机换一个动作，和主宠物同一套点击逻辑；
 - 选择结果存 `localStorage['dsh-tui.skin']`，刷新后保持；
 - 高清立绘点击会切成 `-happy` 变体 3 秒（原版 `MAID_HAPPY_MS`），再自动回常态；
-- 原生像素帧与字符动画走「真像素」路径，立绘走高质量缩放的 `imageSmooth`
+- 原生像素帧走「真像素」路径，立绘走高质量缩放的 `imageSmooth`
   （真图不是整数倍像素网格，强制最近邻会锯齿）。
 
 ## 像素帧素材（精灵图）
@@ -134,8 +130,7 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 - 稳态 `idle` 循环；
 - 点击 → 从该形象全部动画（22 个里除 `idle` / `drag` 的 20 个）随机挑一个完整播一轮，
   时长取该动画一轮的总时长（夹在 0.9–5s）；
-- 900ms 内连点 ≥3 次 → `tickle`；
-- 开屏鲸鱼只有帧序列，没有动画表，回落到左/右 `poke`。
+- 900ms 内连点 ≥3 次 → `tickle`。
 
 ## 侧栏伙伴（⌘B）
 
@@ -210,7 +205,7 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 - 启动页立绘被字符网格压扁（42×30 素材按正方形像素渲染，横向拉宽 31%），
   且加载的是低分辨率字符格；现改为原版原生像素帧 + 正确像素比；
 - 补齐 dsh-TUI 的 Claude 娘 / Codex 娘 / 鲸娘女仆高清立绘，并做成可选形象
-  （9 个形象 + 实时预览选择器 + localStorage 记忆）；
+  （7 个形象 + 实时预览选择器 + localStorage 记忆）；
 - 开屏大字用字体字形画 `█/▀/▄`，字形行高留白导致横条状断层；现改为像素层矩形；
 - 弹层边框/分隔线改用 1px 实线（字符网格画不齐）；
 - 设置页控件命中被整行命中吞掉、开关错位；

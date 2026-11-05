@@ -21,19 +21,11 @@ export interface Anim {
   readonly frames: AnimFrame[];
 }
 
-/** 字符格帧包（deepy / 鲸娘）。 */
+/** 字符格帧包（鲸娘精灵图未就绪时的回落素材）。 */
 export interface SpritePack {
   readonly size: [number, number];
-  /** deepy 素材自带的鲸鱼锚点 */
-  readonly whale_origin?: [number, number];
   readonly palette: Record<string, string>;
   readonly animations: Anim[];
-}
-
-/** 开屏鲸鱼的一帧。 */
-export interface WhaleFrame {
-  readonly name: string;
-  readonly rows: string[];
 }
 
 /** 原生像素帧的时间表：动画 key → 每帧停留时长（ms）。 */
@@ -206,7 +198,7 @@ export interface PixelLayerApi {
 export type SkinId = string;
 
 /** 宠物包类型。 */
-export type PetPackKind = 'anim' | 'sheet' | 'whale' | 'portrait' | 'none';
+export type PetPackKind = 'sheet' | 'portrait' | 'none';
 
 /** 精灵图素材：目录 + 单格尺寸 + 逐帧时长表。 */
 export interface SheetArt {
@@ -224,7 +216,6 @@ export interface PetPack {
   readonly size: [number, number];
   readonly palette?: Record<string, string>;
   readonly anims?: Anim[];
-  readonly frames?: WhaleFrame[];
   readonly art?: PortraitArt;
   readonly sheet?: SheetArt;
 }
