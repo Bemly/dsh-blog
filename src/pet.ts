@@ -100,6 +100,8 @@ interface ImageAnim {
 }
 
 const imgAnims: Record<string, ImageAnim> = Object.create(null) as Record<string, ImageAnim>;
+/** 预缓存过的图片元素（按 URL），imageAnim 复用它，避免二次请求。 */
+const prefetchImgs: Record<string, HTMLImageElement> = Object.create(null) as Record<string, HTMLImageElement>;
 
 function imageAnim(art: SheetArt, key: string): ImageAnim | null {
   const durs = art.timings[key];
@@ -107,7 +109,9 @@ function imageAnim(art: SheetArt, key: string): ImageAnim | null {
   const id = `${art.dir}${key}`;
   const cached = imgAnims[id];
   if (cached !== undefined) return cached;
-  const img = new Image();
+  const url = `${id}.avif`;
+  const pre = prefetchImgs[url];
+  const img = pre ?? new Image();
   const a: ImageAnim = {
     key, img,
     cols: Math.ceil(Math.sqrt(durs.length)),
@@ -117,15 +121,24 @@ function imageAnim(art: SheetArt, key: string): ImageAnim | null {
     bad: false,
   };
   for (const d of durs) a.total += d;
-  img.onload = () => { a.ready = true; };
-  img.onerror = () => { a.bad = true; };
-  img.src = `${id}.avif`;
+  if (pre !== undefined) {
+    if (pre.complete) {
+      a.ready = pre.naturalWidth > 0;
+      a.bad = !a.ready;
+    } else {
+      pre.addEventListener('load', () => { a.ready = true; });
+      pre.addEventListener('error', () => { a.bad = true; });
+    }
+  } else {
+    img.onload = () => { a.ready = true; };
+    img.onerror = () => { a.bad = true; };
+    img.src = url;
+  }
   imgAnims[id] = a;
   return a;
 }
 
-/** 时间 → 帧号（按累加时长定位，与逐帧版本完全一致）。 */
-function frameIndexAt(a: ImageAnim, t: number): number {
+/** 时间 → 帧号（按累加时长定位，与逐帧版本完全一致）。 */function frameIndexAt(a: ImageAnim, t: number): number {
   if (a.total <= 0) return 0;
   const tt = ((t % a.total) + a.total) % a.total;
   let acc = 0;
@@ -425,6 +438,88 @@ function previewStep(p: Player, skin: SkinId): void {
   p.tick(dt);
 }
 
+// ── 后台静默预缓存 ─────────────────────────────────────────
+// 首帧显示完后再拉精灵图：先当前形象，其余形象排队；并发 2、只在空闲时开新请求，
+// 不跟首屏抢带宽。只建 <img> 不解码，真正 decode 仍发生在第一次绘制。
+const prefetchQueue: string[] = [];
+const prefetchQueued = new Set<string>();
+const prefetchDone = new Set<string>();
+let prefetchActive = 0;
+const PREFETCH_CONCURRENCY = 2;
+
+function idleRun(fn: () => void): void {
+  const ric = (globalThis as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
+    .requestIdleCallback;
+  if (ric !== undefined) ric(fn, { timeout: 1500 });
+  else setTimeout(fn, 160);
+}
+
+function prefetchUrls(skin: string): string[] {
+  const urls: string[] = [];
+  const art = SHEETS[skin];
+  if (art !== undefined) for (const key of Object.keys(art.timings)) urls.push(`${art.dir}${key}.avif`);
+  const pt = PORTRAITS[skin];
+  if (pt !== undefined) urls.push(pt.dir + pt.normal, pt.dir + pt.happy);
+  return urls;
+}
+
+function pumpPrefetch(): void {
+  while (prefetchActive < PREFETCH_CONCURRENCY) {
+    const url = prefetchQueue.shift();
+    if (url === undefined) return;
+    prefetchQueued.delete(url);
+    prefetchActive += 1;
+    const img = new Image();
+    prefetchImgs[url] = img;
+    const finish = (): void => {
+      img.onload = null;
+      img.onerror = null;
+      prefetchDone.add(url);
+      prefetchActive -= 1;
+      idleRun(pumpPrefetch);
+    };
+    img.onload = finish;
+    img.onerror = finish;
+    img.src = url;
+  }
+}
+
+function enqueuePrefetch(url: string, front: boolean): void {
+  if (prefetchDone.has(url) || prefetchQueued.has(url)) return;
+  // 正文已经加载/在加载的动画不再排一次
+  if (imgAnims[url.slice(0, -5)] !== undefined) { prefetchDone.add(url); return; }
+  prefetchQueued.add(url);
+  if (front) prefetchQueue.unshift(url);
+  else prefetchQueue.push(url);
+}
+
+function prefetch(skin: SkinId): void {
+  const conn = (navigator as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (conn?.saveData === true) return;
+  if (conn?.effectiveType === 'slow-2g' || conn?.effectiveType === '2g') return;
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-data: reduce)').matches) return;
+
+  // 当前形象插到队首（从队列里摘掉重排，保证换肤后优先级立即生效）
+  const priority = prefetchUrls(skin);
+  for (const url of priority) {
+    if (!prefetchQueued.has(url)) continue;
+    const i = prefetchQueue.indexOf(url);
+    if (i >= 0) prefetchQueue.splice(i, 1);
+    prefetchQueued.delete(url);
+  }
+  for (const url of [...priority].reverse()) enqueuePrefetch(url, true);
+
+  for (const other of Object.keys(SHEETS)) {
+    if (other === skin) continue;
+    for (const url of prefetchUrls(other)) enqueuePrefetch(url, false);
+  }
+  for (const other of Object.keys(PORTRAITS)) {
+    if (other === skin) continue;
+    for (const url of prefetchUrls(other)) enqueuePrefetch(url, false);
+  }
+  idleRun(pumpPrefetch);
+}
+
 export const PetKit: PetKitApi = {
   create(skin: SkinId): Pet {
     return new Player(skin);
@@ -447,6 +542,7 @@ export const PetKit: PetKitApi = {
     const art = SHEETS[skin];
     if (art !== undefined) imageAnim(art, 'idle');
   },
+  prefetch,
   PORTRAITS,
   MOOD_ANIM,
   INTERACT_ANIMS,

@@ -444,6 +444,7 @@ function applySkin(id: string): void {
   try { localStorage.setItem('dsh-tui.skin', id); } catch { /* 忽略 */ }
   pet = PetKit.create(id);
   PetKit.warm(id);
+  PetKit.prefetch(id);
   lastActivity = now();
 }
 
@@ -1142,6 +1143,8 @@ function loop(ts: number): void {
   UI.drawAll();
   positionIme();
   requestAnimationFrame(loop);
+  // 首帧之后再静默预缓存宠物动画，避免跟首屏抢带宽
+  setTimeout(() => PetKit.prefetch(state.skin), 800);
 }
 
 // ── 首启标记 ───────────────────────────────────────────────

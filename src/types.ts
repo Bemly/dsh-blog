@@ -263,6 +263,8 @@ export interface PetKitApi {
   preview(skin: SkinId, layer: PixelLayerApi, x: number, y: number, w: number, h: number): void;
   /** 预览里点一下：随机换一个动作（与主宠物同一套点击逻辑）。 */
   previewClick(skin: SkinId, fracX: number): void;
+  /** 空闲时静默预缓存：先当前形象的全部动画，再其它形象。 */
+  prefetch(skin: SkinId): void;
   warm(skin: SkinId): void;
   readonly PORTRAITS: Record<string, PortraitArt>;
   readonly MOOD_ANIM: Record<string, string>;
