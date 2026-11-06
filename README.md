@@ -61,6 +61,7 @@ bun install → bun run build（内含 blog:build）→ 上传 dist/ → deploy-
 
 ```
 index.html              入口：一块 canvas（字符网格）+ 一个 <script type="module">
+404.html                深链兜底：把 /<文章标题> 转成 /?p=… 再跳回根页面
 serve.ts                开发服务器：Bun.serve + Bun.Transpiler 现场转译 .ts
 build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/ 与 blog 配图
 preview.ts              预览 dist/
@@ -229,7 +230,23 @@ bun run blog:build      # 扫描 blog/ → src/data/posts.ts
 非 AVIF 图片会按 `blog.config.json` 的 `image` 参数（`q 60 / qalpha 60 / -s 0`）就地
 转码，正文引用自动改写。`posts.ts` 是生成物，不要手改。
 
-## 交互
+## 文章链接（深链）
+
+每篇文章有自己的地址，直接打开就是该文章的工作区（不经过首页）：
+
+```
+https://bemly.moe/校园网络
+https://bemly.moe/OpenWrt-GXNAS软路由安装OpenClaw小龙虾教程
+```
+
+- 应用内切换文章时用 `history.pushState` 把地址改成 `/<slug>`；点浏览器后退会回到
+  上一篇（非文章会话的地址是 `/`）；
+- GitHub Pages 是纯静态托管，没有服务端路由：未知路径会落到 `404.html`，它把原路径
+  转成 `/?p=<slug>` 再跳回根页面，由 `app.ts` 的 `slugFromLocation()` 打开对应会话，
+  随后 `replaceState` 把地址还原成 `/<slug>`；
+- `404.html` 里的跳转写死了根路径 `/`，所以要求站点部署在域名根目录（自定义域名）；
+  如果以后放到 `https://user.github.io/repo/` 子路径，需要把那里改成 `/repo/`。
+
 ## 交互
 
 | 按键 | 作用 |
@@ -237,7 +254,7 @@ bun run blog:build      # 扫描 blog/ → src/data/posts.ts
 | `Enter` | 发送 / 确认 |
 | `Tab` | 切换 NORMAL / INSERT |
 | `⌘K` | 命令菜单（可输入过滤） |
-| `⌘B` | 切换右侧面板（进工作区默认打开，首页是「♥ 伙伴」） |
+| `⌘B` | 切换右侧面板（进工作区默认打开，首页是「宠物」页） |
 | `⌘T` / `⌘R` | 侧栏 · 文章列表 / 当前大纲 |
 | `⌘P` | 参数行 |
 | `⌘,` | 设置 |

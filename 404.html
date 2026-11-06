@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>dsh-blog</title>
+  <script>
+    // GitHub Pages 对未知路径返回这个 404 页面；把路径带回根页面，由 app 打开对应文章。
+    // 注意：按自定义域名根目录（https://bemly.moe/<slug>）部署；子路径部署需改 '/'。
+    (function () {
+      var path = location.pathname;
+      try { path = decodeURIComponent(path); } catch (e) { /* 保留原样 */ }
+      path = path.replace(/^\/+|\/+$/g, '');
+      location.replace('/?p=' + encodeURIComponent(path) + location.hash);
+    })();
+  </script>
+</head>
+<body></body>
+</html>

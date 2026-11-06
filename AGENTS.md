@@ -103,6 +103,9 @@ bun run blog:build         # 扫描 blog/ → src/data/posts.ts（自动识别�
 ```
 
 - 只提交 `blog/`（内容）；`posts.ts` 由脚本生成、不入库，改完内容重跑即可；
+- 每篇文章有独立地址 `/<目录名>`：`switchSession()` 用 `pushState` 同步，直接访问由
+  根目录 `404.html` 转成 `/?p=<slug>` 再进应用；**404.html 里写死了根路径 `/`**，
+  改成子路径部署时要一起改；
 - 图片目录里非 AVIF 的图会按 `blog.config.json` 的 `image` 参数就地转码
   （`-q 60 --qalpha 60 -s 0`），正文引用自动改成 AVIF；
 - 整理内容时已剔除 YAML frontmatter（`AIGC:` 标签块）、「内容由 AI 生成」声明行，

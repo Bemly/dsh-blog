@@ -9,7 +9,7 @@
    ═══════════════════════════════════════════════════════════ */
 import type {
   ActionDef, AppApi, AppState, CommandDef, Hit, PanelTab,
-  ParamSeg, Session, SessionGroup, SkinDef, Theme, ThemeName,
+  ParamSeg, Post, Session, SessionGroup, SkinDef, Theme, ThemeName,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { UI } from './tui-ui.ts';
@@ -230,6 +230,36 @@ function deactivateAll(): void {
   for (const g of state.groups) for (const s of g.sessions) s.active = false;
 }
 
+// ── 文章深链：/<中文标题> → 直接打开对应会话 ───────────────
+/** popstate 应用期间暂停写 URL，避免历史记录抖动。 */
+let routing = false;
+
+function slugFromLocation(): string | null {
+  const p = new URLSearchParams(location.search).get('p');
+  if (p !== null && p !== '') return p;
+  const path = location.pathname.replace(/^\/+|\/+$/g, '');
+  if (path === '' || path === 'index.html') return null;
+  try { return decodeURIComponent(path); } catch { return path; }
+}
+
+function postBySlug(slug: string): Post | undefined {
+  return POSTS.find(p => p.slug === slug);
+}
+
+/** 会话对应的地址：文章 → /<slug>，其它 → /。 */
+function urlForSession(id: string): string {
+  const post = POSTS.find(p => p.id === id);
+  return post === undefined ? '/' : '/' + encodeURIComponent(post.slug);
+}
+
+function syncUrl(id: string, push: boolean): void {
+  if (routing) return;
+  const url = urlForSession(id);
+  if (location.pathname === url && location.search === '') return;
+  if (push) window.history.pushState(null, '', url);
+  else window.history.replaceState(null, '', url);
+}
+
 function switchSession(id: string): void {
   const s = state.sessions[id];
   if (s === undefined) return;
@@ -244,6 +274,7 @@ function switchSession(id: string): void {
   // 文章会话从正文顶部开始读，不跟着聊天自动滚到底
   state.userScrolled = id.startsWith('post-');
   state.streaming = false;
+  syncUrl(id, true);
 }
 
 function allSessionIds(): string[] {
@@ -1143,6 +1174,21 @@ function loop(ts: number): void {
   UI.drawAll();
   positionIme();
   requestAnimationFrame(loop);
+  // 前进/后退：按路径切换文章或回首页
+  window.addEventListener('popstate', () => {
+    routing = true;
+    const slug = slugFromLocation();
+    const post = slug === null ? undefined : postBySlug(slug);
+    if (post !== undefined) {
+      switchSession(post.id);
+      state.screen = 'chat';
+      state.overlay = null;
+    } else {
+      state.screen = 'launchpad';
+      state.overlay = null;
+    }
+    routing = false;
+  });
   // 首帧之后再静默预缓存宠物动画，避免跟首屏抢带宽
   setTimeout(() => PetKit.prefetch(state.skin), 800);
 }
@@ -1175,7 +1221,19 @@ export function start(canvas: HTMLCanvasElement): void {
   UI.setApp(api);
   applyTheme('dark');
   buildSeed();
-  if (!readOnboarded()) state.screen = 'onboarding';
+  // 深链：/校园网络 或 /?p=校园网络（404.html 转发）直接进文章工作区
+  const deepSlug = slugFromLocation();
+  const deepPost = deepSlug === null ? undefined : postBySlug(deepSlug);
+  if (deepPost !== undefined) {
+    routing = true;
+    switchSession(deepPost.id);
+    routing = false;
+    state.screen = 'chat';
+    state.overlay = null;
+    window.history.replaceState(null, '', '/' + encodeURIComponent(deepPost.slug));
+  } else if (!readOnboarded()) {
+    state.screen = 'onboarding';
+  }
   try {
     const saved = localStorage.getItem('dsh-tui.skin');
     if (saved !== null && SKINS.some(s => s.id === saved)) state.skin = saved;

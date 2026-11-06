@@ -23,6 +23,7 @@ if (!result.success) {
 }
 
 await cp(`${import.meta.dir}/assets`, `${outdir}/assets`, { recursive: true });
+await cp(`${import.meta.dir}/404.html`, `${outdir}/404.html`);
 
 // blog：只拷运行时需要的配图。正文已经打进 bundle，Markdown / 配置不进 dist。
 const blogDir = `${import.meta.dir}/blog`;

@@ -23,8 +23,9 @@ const MIME: Record<string, string> = {
 };
 
 function extOf(path: string): string {
-  const i = path.lastIndexOf('.');
-  return i < 0 ? '' : path.slice(i);
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const i = name.lastIndexOf('.');
+  return i < 0 ? '' : name.slice(i);
 }
 
 const server = Bun.serve({
@@ -38,7 +39,22 @@ const server = Bun.serve({
     if (!full.startsWith(root + sep)) return new Response('Forbidden', { status: 403 });
 
     const file = Bun.file(full);
-    if (!(await file.exists())) return new Response('Not found', { status: 404 });
+    if (!(await file.exists())) {
+      // 深链 /<中文标题>：与 GitHub Pages 一致，回 404.html 把路径带回根页面。
+      // 只有「看起来像静态文件」的请求才回纯 404（标题里可能带 . 如 DSM7.x）。
+      const want = extOf(rel);
+      const isAsset = MIME[want] !== undefined || want === '.ts';
+      if (!isAsset) {
+        const nf = Bun.file(join(root, '404.html'));
+        if (await nf.exists()) {
+          return new Response(nf, {
+            status: 404,
+            headers: { 'content-type': MIME['.html'] ?? 'text/html', 'cache-control': 'no-cache' },
+          });
+        }
+      }
+      return new Response('Not found', { status: 404 });
+    }
 
     const ext = extOf(full);
     if (ext === '.ts') {

@@ -25,7 +25,20 @@ const server = Bun.serve({
     const full = normalize(join(root, rel));
     if (!full.startsWith(root + sep)) return new Response('Forbidden', { status: 403 });
     const file = Bun.file(full);
-    if (!(await file.exists())) return new Response('Not found', { status: 404 });
+    if (!(await file.exists())) {
+      // 深链 /<中文标题>：与 GitHub Pages 一致，回 404.html 把路径带回根页面。
+      const name = rel.slice(rel.lastIndexOf('/') + 1);
+      const dot = name.lastIndexOf('.');
+      const want = dot < 0 ? '' : name.slice(dot).toLowerCase();
+      const isAsset = Object.prototype.hasOwnProperty.call(MIME, want);
+      if (!isAsset) {
+        const nf = Bun.file(join(root, '404.html'));
+        if (await nf.exists()) {
+          return new Response(nf, { status: 404, headers: { 'content-type': MIME['.html'] ?? 'text/html' } });
+        }
+      }
+      return new Response('Not found', { status: 404 });
+    }
     const ext = full.slice(full.lastIndexOf('.'));
     return new Response(file, { headers: { 'content-type': MIME[ext] ?? 'application/octet-stream' } });
   },
