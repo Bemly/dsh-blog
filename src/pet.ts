@@ -130,6 +130,7 @@ function imageAnim(art: SheetArt, key: string): ImageAnim | null {
       pre.addEventListener('error', () => { a.bad = true; });
     }
   } else {
+    dequeuePrefetch(url);
     img.onload = () => { a.ready = true; };
     img.onerror = () => { a.bad = true; };
     img.src = url;
@@ -468,6 +469,8 @@ function pumpPrefetch(): void {
     const url = prefetchQueue.shift();
     if (url === undefined) return;
     prefetchQueued.delete(url);
+    // 前台已经先发过这张（用户点了这个动作），跳过，避免重复下载
+    if (imgAnims[url.slice(0, -5)] !== undefined) { prefetchDone.add(url); continue; }
     prefetchActive += 1;
     const img = new Image();
     prefetchImgs[url] = img;
@@ -482,6 +485,14 @@ function pumpPrefetch(): void {
     img.onerror = finish;
     img.src = url;
   }
+}
+
+/** 前台要用这个动画：如果还在预取队列里，先摘出来，避免后台重复下载。 */
+function dequeuePrefetch(url: string): void {
+  if (!prefetchQueued.has(url)) return;
+  const i = prefetchQueue.indexOf(url);
+  if (i >= 0) prefetchQueue.splice(i, 1);
+  prefetchQueued.delete(url);
 }
 
 function enqueuePrefetch(url: string, front: boolean): void {
