@@ -22,7 +22,7 @@ bun run dev        # http://127.0.0.1:8899/
 
 ```bash
 bun run typecheck  # tsc --noEmit（strict，零告警）
-bun run build      # index.html → dist/（含 assets/、blog/ 拷贝）
+bun run build      # index.html → dist/（含 assets/ 与 blog 配图）
 bun run preview    # 预览 dist/（http://127.0.0.1:8899/）
 bun run check      # typecheck + build
 bun run blog:build # 扫描 blog/，生成 src/data/posts.ts
@@ -37,7 +37,7 @@ bun run blog:build # 扫描 blog/，生成 src/data/posts.ts
 ```
 index.html              入口：一块 canvas（字符网格）+ 一个 <script type="module">
 serve.ts                开发服务器：Bun.serve + Bun.Transpiler 现场转译 .ts
-build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/、blog/
+build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/ 与 blog 配图
 preview.ts              预览 dist/
 tools/encode-sheet.ts   逐帧 WebP → AVIF 精灵图（ffmpeg + avifenc）
 tools/build-blog.ts     扫描 blog/ → src/data/posts.ts（按 blog.config.json）

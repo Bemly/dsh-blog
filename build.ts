@@ -1,7 +1,8 @@
 /**
- * 生产构建：index.html → dist（含打包后的 JS），再拷贝静态素材目录。
+ * 生产构建：index.html → dist（含打包后的 JS），再拷贝运行时静态素材。
  */
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 
 const outdir = `${import.meta.dir}/dist`;
 
@@ -22,5 +23,15 @@ if (!result.success) {
 }
 
 await cp(`${import.meta.dir}/assets`, `${outdir}/assets`, { recursive: true });
-await cp(`${import.meta.dir}/blog`, `${outdir}/blog`, { recursive: true });
+
+// blog：只拷运行时需要的配图。正文已经打进 bundle，Markdown / 配置不进 dist。
+const blogDir = `${import.meta.dir}/blog`;
+await mkdir(`${outdir}/blog`, { recursive: true });
+for (const entry of await readdir(blogDir, { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  const images = `${blogDir}/${entry.name}/images`;
+  if (!existsSync(images)) continue;
+  await cp(images, `${outdir}/blog/${entry.name}/images`, { recursive: true });
+}
+
 console.log('build ok →', outdir);

@@ -13,7 +13,7 @@
 bun install            # 只装 typescript + @types/bun
 bun run dev            # http://127.0.0.1:8899/，现场转译 .ts，改代码刷新即生效
 bun run check          # typecheck + build，提交前必跑
-bun run build          # → dist/（含 assets 拷贝）
+bun run build          # → dist/（含 assets 与 blog 配图）
 bun run preview        # 预览 dist/
 
 bun run encode:sheet <skin> <源目录> [缩放|WxH=1] [alphaQ=60]
