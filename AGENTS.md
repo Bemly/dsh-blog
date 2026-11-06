@@ -87,9 +87,9 @@ src/data/timings.ts                     # anim-key → 每帧时长数组（ms�
 文章内容放在仓库根的 `blog/`：一篇一个文件夹，Markdown 与配图同目录。
 
 ```
-blog/blog.config.json     标题 / 入口文件 / 图片目录 / exclude / AVIF 参数
-blog/<序号>/index.md      正文（图片写成 images/xxx.avif）
-blog/<序号>/images/*.avif 配图
+blog/blog.config.json     标题 / 入口文件 / 图片目录 / exclude / sort / AVIF 参数
+blog/校园网络/index.md     正文（目录名 = 中文标题，图片写成 images/xxx.avif）
+blog/校园网络/images/*.avif 配图
 ```
 
 启动时由 `app.ts` 的 `seedPosts()` 灌成普通会话（分组名取配置的 `title`）——

@@ -34,13 +34,13 @@ export type ImageTimings = Record<string, readonly number[]>;
 /** 博客文章（src/data/posts.ts 由 tools/import-blog.ts 生成）。 */
 export interface Post {
   readonly id: string;
-  /** 序号（001…），列表展示与阅读器页脚用。 */
-  readonly no: string;
+  /** 目录名（中文标题）；图片路径为 blog/<slug>/images/… */
+  readonly slug: string;
   readonly title: string;
   /** 收录日期（YYYY-MM-DD，没有则为空串）。 */
   readonly date: string;
   readonly excerpt: string;
-  /** Markdown 正文，图片路径已改写为 blog/<序号>/images/… */
+  /** Markdown 正文，图片路径已改写为 blog/<slug>/images/… */
   readonly body: string;
 }
 

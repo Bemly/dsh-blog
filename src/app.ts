@@ -353,7 +353,7 @@ function seedPosts(): void {
   if (POSTS.length === 0) return;
   const group: SessionGroup = { name: BLOG_TITLE, sessions: [] };
   for (const p of POSTS) {
-    const id = 'post-' + p.no;
+    const id = p.id;
     state.sessions[id] = {
       id,
       title: p.title,

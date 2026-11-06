@@ -4,6 +4,7 @@
   "entry": "index.md",
   "images": "images",
   "exclude": [],
+  "sort": "date-desc",
   "image": {
     "format": "avif",
     "quality": 60,

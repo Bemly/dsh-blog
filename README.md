@@ -64,9 +64,9 @@ assets/
   whale-maid-plush-sheet/ 鲸娘女仆毛绒精灵图（22 张 / 348 帧，630×819）
   portraits/            高清立绘：whale-girl（女仆鲸娘，normal + happy）
 blog/
-  blog.config.json      文章目录配置：标题 / 入口文件 / 图片目录 / 排除项 / 编码参数
-  <序号>/index.md       文章 Markdown（图片用相对路径 images/xxx.avif）
-  <序号>/images/*.avif  正文配图（q60 · -s 0）
+  blog.config.json      标题 / 入口文件 / 图片目录 / 排除项 / 排序 / AVIF 编码参数
+  校园网络/index.md      正文（目录名就是文章标题，图片引用写成 images/xxx.avif）
+  校园网络/images/*.avif 配图
 ```
 
 ## 角色形象（原版搬运，可在设置里选）
@@ -164,12 +164,14 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 
 ```
 blog/
-  blog.config.json      标题 / 入口文件 / 图片目录 / 排除项 / AVIF 编码参数
-  001/index.md          正文（图片引用写成 images/xxx.avif）
-  001/images/*.avif     配图
+  blog.config.json      标题 / 入口文件 / 图片目录 / 排除项 / 排序 / AVIF 编码参数
+  校园网络/index.md      正文（目录名 = 中文标题，图片写成 images/xxx.avif）
+  校园网络/images/*.avif 配图
   ...
 ```
 
+- 目录名直接取文章标题（中文），不用序号；重名会自动加 `-2` 后缀；
+- 排序由配置的 `sort` 决定：`date-desc`（默认，新→旧）/ `date-asc` / `name`；
 - 133 篇在启动时由 `seedPosts()` 灌成普通会话，分组名取配置里的 `title`——没有单独的
   阅读界面，选中就是现有的 TUI 对话框：顶栏标题、system 行「收录于 …」、正文走
   assistant 消息的 Markdown 渲染，配图就地铺在消息流；

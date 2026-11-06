@@ -23,6 +23,8 @@ interface BlogConfig {
   entry: string;
   images: string;
   exclude?: string[];
+  /** 排序：date-desc（默认，新→旧）/ date-asc / name（按目录名中文排序）。 */
+  sort?: 'date-desc' | 'date-asc' | 'name';
   image?: { format?: string; quality?: number; alphaQuality?: number; speed?: number };
 }
 
@@ -37,6 +39,7 @@ function readConfig(): BlogConfig {
     entry: raw.entry ?? 'index.md',
     images: raw.images ?? 'images',
     exclude: raw.exclude ?? [],
+    sort: raw.sort ?? 'date-desc',
     image: raw.image,
   };
 }
@@ -72,28 +75,45 @@ function excerptOf(body: string): string {
 }
 
 const cfg = readConfig();
-const dirs = readdirSync(BLOG)
-  .filter(name => {
-    const full = join(BLOG, name);
-    return statSync(full).isDirectory() && !name.startsWith('.') && !(cfg.exclude ?? []).includes(name);
-  })
-  .sort((a, b) => a.localeCompare(b, 'en'));
+interface Entry { dir: string; title: string; date: string; body: string }
+
+const dirs = readdirSync(BLOG).filter(name => {
+  const full = join(BLOG, name);
+  return statSync(full).isDirectory() && !name.startsWith('.') && !(cfg.exclude ?? []).includes(name);
+});
+
+const entries: Entry[] = [];
+for (const dir of dirs) {
+  const entryPath = join(BLOG, dir, cfg.entry);
+  if (!existsSync(entryPath)) continue;
+  const body = readFileSync(entryPath, 'utf8').replace(/\r\n/g, '\n').replace(/^\n+/, '');
+  const h1 = body.match(/^#\s+(.+)$/m);
+  entries.push({
+    dir,
+    title: (h1?.[1] ?? dir).trim(),
+    date: (body.match(/收录时间[：:]\s*([0-9-]{8,10})/) ?? [, ''])[1] ?? '',
+    body,
+  });
+}
+
+const sort = cfg.sort ?? 'date-desc';
+entries.sort((a, b) => {
+  if (sort === 'name') return a.dir.localeCompare(b.dir, 'zh');
+  const da = a.date || '0000-00-00';
+  const db = b.date || '0000-00-00';
+  if (da !== db) return sort === 'date-asc' ? da.localeCompare(db) : db.localeCompare(da);
+  return a.title.localeCompare(b.title, 'zh');
+});
 
 const sizes: Record<string, readonly [number, number]> = {};
 const posts: string[] = [];
 let imageCount = 0;
 
-for (const dir of dirs) {
+for (const entry of entries) {
+  const dir = entry.dir;
   const postDir = join(BLOG, dir);
-  const entryPath = join(postDir, cfg.entry);
-  if (!existsSync(entryPath)) continue;
-  const rawBody = readFileSync(entryPath, 'utf8').replace(/\r\n/g, '\n').replace(/^\n+/, '');
-  const no = dir;
-  const h1 = rawBody.match(/^#\s+(.+)$/m);
-  const title = (h1?.[1] ?? dir).trim();
-  const date = (rawBody.match(/收录时间[：:]\s*([0-9-]{8,10})/) ?? [, ''])[1] ?? '';
 
-  const body = rawBody.replace(IMG_RX, (whole, alt: string, src: string) => {
+  const body = entry.body.replace(IMG_RX, (whole, alt: string, src: string) => {
     if (/^(https?:|data:)/i.test(src)) return whole;
     const abs = resolve(postDir, decodeURIComponent(src));
     if (!existsSync(abs)) return '';
@@ -106,7 +126,14 @@ for (const dir of dirs) {
     return '![' + alt + '](' + web + ')';
   }).replace(/\n{3,}/g, '\n\n');
 
-  posts.push(JSON.stringify({ id: 'p' + no, no, title, date, excerpt: excerptOf(body), body }));
+  posts.push(JSON.stringify({
+    id: 'post-' + dir,
+    slug: dir,
+    title: entry.title,
+    date: entry.date,
+    excerpt: excerptOf(body),
+    body,
+  }));
 }
 
 const header = '/* 自动生成：tools/build-blog.ts（读 blog/blog.config.json）；不要手改 */\n' +
