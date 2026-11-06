@@ -451,7 +451,8 @@ function resetCompanion(): void {
 
 function togglePanel(tab?: string): void {
   if (tab === undefined) { state.panelOpen = !state.panelOpen; if (!state.panelOpen) resetCompanion(); return; }
-  if (state.panelOpen && state.panelTab === tab) { state.panelOpen = false; resetCompanion(); return; }
+  // 点当前 tab 不收起侧栏（只切页；收起走 ⌘B）
+  if (state.panelOpen && state.panelTab === tab) return;
   state.panelOpen = true;
   state.panelTab = tab;
   if (tab !== 'companion') resetCompanion();
