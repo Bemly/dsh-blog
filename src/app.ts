@@ -66,8 +66,8 @@ const SKINS: SkinDef[] = [
 
 const TIPS: readonly string[] = [
   '第一次用 dsh-TUI？花一分钟跑一遍引导，把 API Key、语言、主题、模型一次配好。',
-  'Tab 切换 NORMAL / INSERT，Esc 关闭弹层，⌘K 打开命令菜单。',
-  '⌘B 切换右侧面板，⌘T / ⌘R 打开文章列表 / 当前大纲。',
+  'Tab 切换 NORMAL / INSERT，Esc 关闭弹层，顶栏「菜单」打开命令列表。',
+  '顶栏「侧栏」收起 / 展开右侧面板，页签切宠物 / 文章 / 大纲。',
   '点一下宠物随机换一个动作，连点三下会 tickle。',
   '输入 / 开头可以看命令提示；Shift+Enter 换行由浏览器保留。',
 ];
@@ -180,16 +180,16 @@ let blinkAt = now();
 
 // ── 命令表 ─────────────────────────────────────────────────
 const COMMANDS: CommandDef[] = [
-  { id: 'newchat', label: '＋ 新对话', key: '⌘N', desc: '从空白会话开始', action: 'newchat' },
-  { id: 'continue', label: '▷ 继续最近', key: '⌘J', desc: '恢复上次会话', action: 'continue' },
+  { id: 'newchat', label: '＋ 新对话', key: '', desc: '从空白会话开始', action: 'newchat' },
+  { id: 'continue', label: '▷ 继续最近', key: '', desc: '恢复上次会话', action: 'continue' },
   { id: 'sessions-workspace', label: '◫ 会话与工作区', key: '', desc: '会话名册 / 工作区', action: 'sessions' },
-  { id: 'cmdmenu', label: '⌘ 命令菜单', key: '⌘K', desc: '所有快捷指令', action: 'cmdmenu' },
+  { id: 'cmdmenu', label: '☰ 命令菜单', key: '', desc: '所有快捷指令', action: 'cmdmenu' },
   { id: 'help', label: '? 快捷键帮助', key: '?', desc: '查看按键说明', action: 'help' },
-  { id: 'settings', label: '⚙ 打开设置', key: '⌘,', desc: '主题 / 宠物 / 偏好', action: 'settings' },
-  { id: 'panel-companion', label: '♥ 侧栏 · 宠物', key: '⌘B', desc: '侧栏宠物 / 戳一戳', action: 'panel:companion' },
-  { id: 'panel-posts', label: '☰ 侧栏 · 文章列表', key: '⌘T', desc: '全部文章', action: 'panel:posts' },
-  { id: 'panel-outline', label: '≡ 侧栏 · 当前大纲', key: '⌘R', desc: '当前文章标题树', action: 'panel:outline' },
-  { id: 'param', label: '⚙ 参数行', key: '⌘P', desc: '调整模型参数', action: 'param' },
+  { id: 'settings', label: '⚙ 打开设置', key: '', desc: '主题 / 宠物 / 偏好', action: 'settings' },
+  { id: 'panel-companion', label: '♥ 侧栏 · 宠物', key: '', desc: '侧栏宠物 / 戳一戳', action: 'panel:companion' },
+  { id: 'panel-posts', label: '☰ 侧栏 · 文章列表', key: '', desc: '全部文章', action: 'panel:posts' },
+  { id: 'panel-outline', label: '≡ 侧栏 · 当前大纲', key: '', desc: '当前文章标题树', action: 'panel:outline' },
+  { id: 'param', label: '⚙ 参数行', key: '', desc: '调整模型参数', action: 'param' },
   { id: 'theme', label: '◐ 切换主题', key: '', desc: '深色 / 浅色', action: 'theme' },
   { id: 'skin', label: '✿ 切换宠物形象', key: '', desc: '鲸娘 / Claude 娘 / Codex 娘 / 女仆鲸娘', action: 'skin-picker' },
   { id: 'model', label: '◎ 切换模型', key: '', desc: '循环默认模型', action: 'model' },
@@ -197,7 +197,7 @@ const COMMANDS: CommandDef[] = [
   { id: 'autoscroll', label: '⇣ 自动滚动', key: '', desc: '开 / 关', action: 'tog-autoscroll' },
   { id: 'pet', label: '✋ 宠物互动', key: '', desc: 'poke / tickle', action: 'pet' },
   { id: 'clear-sessions', label: '✕ 清除全部会话', key: '', desc: '删除演示会话', action: 'clear-sessions' },
-  { id: 'fullscreen', label: '⛶ 全屏', key: 'F11', desc: '切换浏览器全屏', action: 'fullscreen' },
+  { id: 'fullscreen', label: '⛶ 全屏', key: '', desc: '切换浏览器全屏', action: 'fullscreen' },
 ];
 
 // ── 工具函数 ───────────────────────────────────────────────
@@ -355,7 +355,7 @@ function seedPosts(): void {
 const REPLY_POOL: readonly string[] = [
   '## 完成情况\n\nCanvas 真 TUI 架构已落地：\n\n- 帧循环 + 输入映射 + 布局系统全部就绪\n- 6 个像素形象完整移植\n\n```ts\n// 宠物统一驱动\npet.renderTo(PixelLayer, x, y, w, h);\n```\n\n> 浏览器直接打开 index.html 即可运行。',
   '## 宠物清单\n\n盘点 dsh-TUI 全部像素角色：\n\n1. **鲸娘 · 动画** — 22 个动画（原生像素帧）\n2. **Claude 娘 / Codex 娘** — 原生像素帧精灵图\n3. **鲸娘 · 女仆** — 高清立绘 / 插画序列帧\n\n| 皮肤 | 数据源 |\n|---|---|\n| whalegirl | assets/whalegirl |\n| portraits | assets/portraits |',
-  '## 交互提示\n\n- 点击启动页立绘可互动（poke / happy）\n- ⌘K 打开命令菜单，⌘B / ⌘P 切换面板与参数\n- 设置页可切换 6 个形象\n\n```\nNORMAL / INSERT 模式\nTab 切换 · Enter 发送\n```',
+  '## 交互提示\n\n- 点击启动页立绘可互动（poke / happy）\n- 顶栏「菜单」打开命令列表，「侧栏」收起或展开\n- 设置页可切换 6 个形象\n\n```\nNORMAL / INSERT 模式\nTab 切换 · Enter 发送\n```',
   '## 后续建议\n\n已满足核心要求，可继续扩展：\n\n- [x] 全部形象移植\n- [x] Canvas 逐帧渲染\n- [ ] 真实模型接入\n- [ ] 会话持久化',
 ];
 
@@ -451,7 +451,7 @@ function resetCompanion(): void {
 
 function togglePanel(tab?: string): void {
   if (tab === undefined) { state.panelOpen = !state.panelOpen; if (!state.panelOpen) resetCompanion(); return; }
-  // 点当前 tab 不收起侧栏（只切页；收起走 ⌘B）
+  // 点当前 tab 不收起侧栏（只切页；收起走顶栏「侧栏」）
   if (state.panelOpen && state.panelTab === tab) return;
   state.panelOpen = true;
   state.panelTab = tab;
@@ -568,6 +568,7 @@ function dispatch(action: string | null): void {
   switch (head) {
     case 'switch': switchSession(rest); state.overlay = null; setScreen('chat'); return;
     case 'panel': togglePanel(rest); return;
+    case 'panel-toggle': togglePanel(); return;
     case 'think': toggleThink(rest); return;
     case 'poptune': paramAdjust(rest); return;
     case 'outline': {
@@ -719,16 +720,8 @@ function onKey(e: KeyboardEvent): void {
   const k = e.key;
   if (e.isComposing || k === 'Process') return;
 
-  if (meta && k.toLowerCase() === 'k') { toggleOverlay('cmdmenu'); state.cmdFilter = ''; state.cmdSel = 0; e.preventDefault(); return; }
-  if (meta && k === ',') { setScreen('settings'); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'n') { newChat(); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'j') { continueLast(); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'b') { togglePanel(); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'p') { toggleOverlay('param'); state.paramSel = 0; e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 't') { togglePanel('posts'); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'r') { togglePanel('outline'); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'o') { setScreen('settings'); e.preventDefault(); return; }
-  if (k === 'F11') { toggleFullscreen(); e.preventDefault(); return; }
+  // 不再绑 ⌘/Ctrl 组合：这些都被浏览器占了（⌘K 地址栏、⌘T 新标签、⌘R 刷新…），
+  // 面板/菜单/设置统一走界面按钮。
 
   if (state.overlay === 'help') {
     if (k === 'Escape' || k === 'Enter') { state.overlay = null; e.preventDefault(); }

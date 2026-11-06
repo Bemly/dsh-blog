@@ -293,18 +293,38 @@ function launchGeom(): LaunchGeom {
 }
 
 // ── 聊天标题行 ─────────────────────────────────────────────
+/** 顶栏按钮：悬停高亮，点击走 action。返回占用宽度。 */
+function headBtn(x: number, label: string, id: string, action: string): number {
+  if (App === null) return 0;
+  const w = W(label) + 2;
+  const hover = App.state.hoverId === id;
+  const bg = hover ? T().accentDim : T().panel;
+  TUI.fill(x, 0, w, 1, { bg });
+  TUI.text(x + 1, 0, label, hover ? '#eef2fa' : T().dim, bg);
+  hit(id, x, 0, w, 1, action, label);
+  return w;
+}
+
 function drawHead(): void {
   if (App === null) return;
   const L = layout();
   TUI.fill(L.head.x, L.head.y, L.head.w, L.head.h, { bg: T().panel });
+  hit('head', 0, 0, L.head.w, 1, null, '');
   TUI.text(1, 0, '✦', T().accent, T().panel, ST.BOLD);
   TUI.text(3, 0, 'dsh-TUI', T().dim, T().panel);
+
+  const panelLabel = App.state.panelOpen ? '收起侧栏' : '侧栏';
+  const menuW = W('菜单') + 2;
+  let bx = L.head.w - 1 - menuW;
+  headBtn(bx, '菜单', 'head-menu', 'cmdmenu');
+  bx -= 1 + W(panelLabel) + 2;
+  headBtn(bx, panelLabel, 'head-panel', 'panel-toggle');
+  if (App.state.streaming) TUI.text(bx - 10, 0, '◐ 生成中', T().accent, T().panel);
+
   const title = App.state.session?.title ?? '新的对话';
-  const tx = Math.floor((L.head.w - W(title)) / 2);
-  TUI.text(tx, 0, clipLine(title, L.head.w - 24), T().fg, T().panel, ST.BOLD);
-  const right = App.state.streaming ? '◐ 生成中' : '⌘';
-  TUI.text(L.head.w - 1 - W(right), 0, right, App.state.streaming ? T().accent : T().dim, T().panel);
-  hit('head', 0, 0, L.head.w, 1, null, title);
+  const titleMax = Math.max(8, bx - 10);
+  const tx = 4 + Math.floor(Math.max(0, titleMax - Math.min(W(title), titleMax)) / 2);
+  TUI.text(tx, 0, clipLine(title, titleMax), T().fg, T().panel, ST.BOLD);
 }
 
 // ── 右侧面板 ───────────────────────────────────────────────
@@ -1327,13 +1347,14 @@ function drawHelp(): void {
   const x = cx - Math.floor(bw / 2);
   const y = cy - Math.floor(bh / 2);
   TUI.fill(0, 0, TUI.COLS, TUI.ROWS, { bg: 'rgba(0,0,0,0.55)' });
-  modalBox(x, y, bw, bh, ' 快捷键帮助 ');
+  modalBox(x, y, bw, bh, ' 按键与操作 ');
   const keys: [string, string][] = [
-    ['Enter', '发送消息 / 确认'], ['Shift+Tab', '切换 NORMAL / INSERT'], ['Tab', '切换模式'],
-    ['↑ / ↓', '命令历史'], ['⌘B', '切换右侧面板'],
-    ['⌘T / ⌘R', '侧栏 · 文章 / 大纲'],
-    ['⌘N / ⌘K', '新对话 / 命令菜单'], ['⌘P', '参数行'], ['?', '本帮助'],
-    ['F11', '全屏'], ['点击宠物', 'poke / tickle 互动'], ['Esc', '关闭弹层'],
+    ['Enter', '发送消息 / 确认'], ['Tab / Shift+Tab', '切换 NORMAL / INSERT'],
+    ['↑ / ↓', '命令历史'], ['Esc', '关闭弹层'],
+    ['顶栏「菜单」', '命令 / 新建 / 设置'], ['顶栏「侧栏」', '收起 / 展开面板'],
+    ['页签', '宠物 / 文章 / 大纲'], ['文章标题', '点击切换文章'],
+    ['大纲条目', '跳到正文位置'], ['点击宠物', 'poke / tickle 互动'],
+    ['滚轮', '正文滚动（滚动条可拖）'], ['?', '本帮助'],
   ];
   let row = y + 2;
   for (const [k, d] of keys) {

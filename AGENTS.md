@@ -121,7 +121,7 @@ bun run blog:build         # 扫描 blog/ → src/data/posts.ts（自动识别�
 1. `bun run check`（typecheck + build）；
 2. **帧数一致**：`timings` 每个 key 的数组长度 == 源目录该动画的帧数；
 3. **尺寸合规**：`avifdec --info assets/<skin>-sheet/*.avif | grep Resolution`，全部 < 4096；
-4. **浏览器实测**：⌘K →「形象」→ 选中并应用 → 截图看立绘 → 点击触发 poke，
+4. **浏览器实测**：顶栏「菜单」→「形象」→ 选中并应用 → 截图看立绘 → 点击触发 poke，
    确认无 404、无 `pageerror`（用 Playwright + `/Applications/Chromium.app`）；
 5. 提交并推送。
 
