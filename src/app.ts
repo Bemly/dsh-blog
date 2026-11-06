@@ -260,6 +260,22 @@ function syncUrl(id: string, push: boolean): void {
   else window.history.replaceState(null, '', url);
 }
 
+/** 前进/后退：按地址切回对应文章，找不到就回启动页。只注册一次（见 start）。 */
+function onPopState(): void {
+  routing = true;
+  const slug = slugFromLocation();
+  const post = slug === null ? undefined : postBySlug(slug);
+  if (post !== undefined) {
+    switchSession(post.id);
+    state.screen = 'chat';
+    state.overlay = null;
+  } else {
+    state.screen = 'launchpad';
+    state.overlay = null;
+  }
+  routing = false;
+}
+
 function switchSession(id: string): void {
   const s = state.sessions[id];
   if (s === undefined) return;
@@ -1168,23 +1184,6 @@ function loop(ts: number): void {
   UI.drawAll();
   positionIme();
   requestAnimationFrame(loop);
-  // 前进/后退：按路径切换文章或回首页
-  window.addEventListener('popstate', () => {
-    routing = true;
-    const slug = slugFromLocation();
-    const post = slug === null ? undefined : postBySlug(slug);
-    if (post !== undefined) {
-      switchSession(post.id);
-      state.screen = 'chat';
-      state.overlay = null;
-    } else {
-      state.screen = 'launchpad';
-      state.overlay = null;
-    }
-    routing = false;
-  });
-  // 首帧之后再静默预缓存宠物动画，避免跟首屏抢带宽
-  setTimeout(() => PetKit.prefetch(state.skin), 800);
 }
 
 // ── 首启标记 ───────────────────────────────────────────────
@@ -1245,10 +1244,14 @@ export function start(canvas: HTMLCanvasElement): void {
   TUI.Input.leave = onLeave;
   TUI.Input.wheel = onWheel;
   window.addEventListener('focus', focusIme);
+  // 只在这里注册一次：历史上它被放进帧循环，每帧都会累积一个监听器
+  window.addEventListener('popstate', onPopState);
   document.addEventListener('mousedown', (e: MouseEvent) => {
     const target = e.target;
     if (target instanceof HTMLElement && target.id === 'tui-ime') return;
     setTimeout(focusIme, 0);
   });
   requestAnimationFrame(loop);
+  // 首帧之后再静默预缓存宠物动画，避免跟首屏抢带宽
+  setTimeout(() => PetKit.prefetch(state.skin), 800);
 }

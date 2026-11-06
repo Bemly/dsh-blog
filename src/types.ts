@@ -31,7 +31,7 @@ export interface SpritePack {
 /** 原生像素帧的时间表：动画 key → 每帧停留时长（ms）。 */
 export type ImageTimings = Record<string, readonly number[]>;
 
-/** 博客文章（src/data/posts.ts 由 tools/import-blog.ts 生成）。 */
+/** 博客文章（src/data/posts.ts 由 tools/build-blog.ts 生成）。 */
 export interface Post {
   readonly id: string;
   /** 目录名（中文标题）；图片路径为 blog/<slug>/images/… */
