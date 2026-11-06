@@ -9,14 +9,14 @@
    命中：每帧把可点击区 push 到 App._hits，鼠标由 App 分发。
    ═══════════════════════════════════════════════════════════ */
 import type {
-  AppApi, Block, CommandDef, Hit, PetDragLimits, PetRect, PixelLayerApi,
+  AppApi, Block, CommandDef, Hit, PetDragLimits, PetRect, PixelLayerApi, Post,
   RenderToken, SkinDef, Token,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { PixelLayer } from './pixel-layer.ts';
 import { MDKit } from './markdown.ts';
 import { PetKit } from './pet.ts';
-import { POST_IMAGE_SIZE } from './data/posts.ts';
+import { POSTS, POST_IMAGE_SIZE } from './data/posts.ts';
 
 const T = (): typeof TUI.THEME => TUI.THEME;
 const ST = TUI.ST;
@@ -332,31 +332,8 @@ function drawPanel(): void {
   }
   TUI.hline(P.x + 1, P.y + 1, P.w - 2, T().border, T().panel);
   if (App.state.panelTab === 'companion') { drawCompanion(P); return; }
-  const area: Rect = { x: P.x + 2, y: P.y + 2, w: P.w - 4, h: P.h - 3 };
-  const data = App.state.panelData[App.state.panelTab] ?? [];
-  let y = area.y;
-  for (const item of data) {
-    if (y >= area.y + area.h) break;
-    if (item.type === 'head') {
-      TUI.text(area.x, y, item.text, T().dim, T().panel, ST.BOLD);
-      y += 1;
-    } else if (item.type === 'hr') {
-      TUI.hline(area.x, y, area.w, T().border, T().panel);
-      y += 1;
-    } else if (item.type === 'item') {
-      const st = item.status;
-      const dot = st === 'done' ? '✓' : st === 'running' ? '◐' : st === 'error' ? '✗' : '○';
-      const fg = st === 'done' ? T().green : st === 'running' ? T().yellow : st === 'error' ? T().red : T().fg;
-      TUI.text(area.x, y, clipLine(`${dot} ${item.text}`, area.w), fg, T().panel, st === 'running' ? ST.BOLD : 0);
-      y += 1;
-    } else {
-      const barW = Math.min(area.w - 14, 26);
-      progressBar(area.x, y, barW, item.frac, 5);
-      TUI.text(area.x + barW + 1, y, item.text, T().dim, T().panel);
-      y += 1;
-    }
-    if ('gap' in item && item.gap === true) y += 1;
-  }
+  if (App.state.panelTab === 'posts') { drawPosts(P); return; }
+  if (App.state.panelTab === 'outline') { drawOutline(P); return; }
 }
 
 
@@ -465,6 +442,60 @@ function drawFloatingPet(): void {
   drawCompanionPet(floatSlot(), App.skinMeta(App.state.skin).label);
 }
 
+// ── 侧栏：文章列表 / 当前大纲 ───────────────────────────────
+function postAt(i: number): Post | undefined {
+  return POSTS[i] as Post | undefined;
+}
+
+function drawPosts(P: Rect): void {
+  if (App === null) return;
+  const area: Rect = { x: P.x + 2, y: P.y + 2, w: P.w - 4, h: P.h - 3 };
+  const total = POSTS.length;
+  const listRows = Math.max(1, area.h - 1);
+  const top = Math.max(0, Math.min(App.state.postsTop, Math.max(0, total - listRows)));
+  App.state.postsTop = top;
+  TUI.text(area.x, area.y, clipLine(`共 ${total} 篇`, area.w), T().dim, T().panel);
+  const cur = App.state.session?.id ?? '';
+  for (let i = 0; i < listRows; i++) {
+    const p = postAt(top + i);
+    if (p === undefined) break;
+    const y = area.y + 1 + i;
+    const isCur = p.id === cur;
+    const hover = App.state.hoverId === 'postrow:' + p.id;
+    const bg = hover ? T().thinkBg : undefined;
+    if (bg !== undefined) TUI.fill(area.x, y, area.w, 1, { bg });
+    TUI.text(area.x, y, isCur ? '●' : ' ', isCur ? T().accent : T().dim, bg);
+    TUI.text(area.x + 2, y, clipLine(p.title, area.w - 2), hover || isCur ? T().suggestion : T().fg, bg, isCur ? ST.BOLD : 0);
+    hit('postrow:' + p.id, area.x, y, area.w, 1, 'switch:' + p.id, p.title);
+  }
+}
+
+function drawOutline(P: Rect): void {
+  if (App === null) return;
+  const area: Rect = { x: P.x + 2, y: P.y + 2, w: P.w - 4, h: P.h - 3 };
+  const s = App.state.session;
+  TUI.text(area.x, area.y, clipLine(s?.title ?? '未打开会话', area.w), T().fg, T().panel, ST.BOLD);
+  TUI.hline(area.x, area.y + 1, area.w, T().border, T().panel);
+  if (chatOutline.length === 0) {
+    TUI.text(area.x, area.y + 3, '当前会话没有标题', T().dim, T().panel);
+    return;
+  }
+  let y = area.y + 2;
+  for (let i = 0; i < chatOutline.length && y < area.y + area.h; i++) {
+    const h = chatOutline[i];
+    if (h === undefined) continue;
+    const indent = Math.min(3, Math.max(0, h.level - 1)) * 2;
+    const hover = App.state.hoverId === 'outline:' + i;
+    const bg = hover ? T().thinkBg : undefined;
+    if (bg !== undefined) TUI.fill(area.x, y, area.w, 1, { bg });
+    const prefix = h.level <= 1 ? '▸ ' : '· ';
+    TUI.text(area.x + indent, y, clipLine(prefix + h.title, area.w - indent),
+      hover ? T().suggestion : (h.level <= 1 ? T().accent : T().fg), bg);
+    hit('outline:' + i, area.x, y, area.w, 1, 'outline:' + h.row, h.title);
+    y += 1;
+  }
+}
+
 /** 宠物槽位的 CSS 像素矩形（未加拖动位移）；不可见时 null。 */
 function companionPetRect(): PetRect | null {
   const s = companionSlotFor();
@@ -514,6 +545,11 @@ type Line =
   | { kind: 'image'; src: string; alt: string; cols: number; rows: number }
   | { kind: 'gap' };
 
+/** 当前会话的大纲（标题 + 视觉行号）。 */
+let chatOutline: { title: string; level: number; row: number }[] = [];
+/** 正文滚动条几何（CSS 像素），供拖拽映射。 */
+let scrollGeo: { top: number; height: number; max: number } | null = null;
+
 function drawMessages(): void {
   if (App === null) return;
   const L = layout();
@@ -526,16 +562,24 @@ function drawMessages(): void {
     return;
   }
   const lines: Line[] = [];
+  const heads: HeadingMark[] = [];
   lines.push({ kind: 'label', text: `── ${App.dateLabel(s.time)} ──`, fg: T().dim });
   for (const msg of s.messages) {
     const isLast = msg === s.messages[s.messages.length - 1];
     const streamAcc = isLast && App.state.streaming && s.id === App.state.streamSessionId ? App.state.streamAcc : null;
-    layoutMessage(msg, area.w, lines, streamAcc);
+    layoutMessage(msg, area.w, lines, streamAcc, heads);
   }
   if (lines.length <= 1) lines.push({ kind: 'label', text: '  输入消息开始新的对话', fg: T().dim });
   // 逻辑行 → 视觉行：图片占 rows 行，其余各占 1 行（否则后续文字会压进图里）
   const heights = lines.map(ln => ln.kind === 'image' ? Math.max(1, ln.rows) : 1);
   const totalRows = heights.reduce((a, b) => a + b, 0);
+  // 标题在视觉行里的位置，供侧栏「大纲」跳转
+  const tops: number[] = new Array(lines.length);
+  {
+    let acc = 0;
+    for (let i = 0; i < lines.length; i++) { tops[i] = acc; acc += heights[i] ?? 1; }
+  }
+  chatOutline = heads.map(h => ({ title: h.title, level: h.level, row: tops[h.line] ?? 0 }));
   const visible = area.h;
   const maxScroll = Math.max(0, totalRows - visible);
   if (App.state.autoScroll && !App.state.userScrolled) App.state.scroll = maxScroll;
@@ -563,13 +607,16 @@ function drawMessages(): void {
     drawLine(area.x, area.y + rel, area.w, ln);
   }
   // 滚动条（原版 ScrollbarGutter）
+  scrollGeo = maxScroll > 0 ? { top: area.y * TUI.ch, height: visible * TUI.ch, max: maxScroll } : null;
   if (maxScroll > 0) {
     const trackX = m.x + m.w - 1;
     const trackH = visible;
     const thumbH = Math.max(1, Math.round(trackH * visible / totalRows));
     const thumbY = area.y + Math.round((trackH - thumbH) * (scroll / maxScroll));
-    TUI.fill(trackX, area.y, 1, trackH, { bg: T().panel2 });
-    TUI.fill(trackX, thumbY, 1, thumbH, { bg: T().dim });
+    const hover = App.state.hoverId === 'scrollbar';
+    TUI.fill(trackX, area.y, 1, trackH, { bg: hover ? T().border : T().panel2 });
+    TUI.fill(trackX, thumbY, 1, thumbH, { bg: hover ? T().accent : T().dim });
+    hit('scrollbar', trackX, area.y, 1, trackH, 'scroll-drag', 'scroll');
   }
 }
 
@@ -695,7 +742,7 @@ function drawMermaidLine(x: number, y: number, w: number, ln: Extract<Line, { ki
   }
 }
 
-function layoutMessage(m: import('./types.ts').Message, width: number, lines: Line[], streamAcc: string | null): void {
+function layoutMessage(m: import('./types.ts').Message, width: number, lines: Line[], streamAcc: string | null, heads?: HeadingMark[]): void {
   switch (m.type) {
     case 'system':
       lines.push({ kind: 'label', text: ` ⚡ ${m.content}`, fg: T().yellow });
@@ -736,15 +783,19 @@ function layoutMessage(m: import('./types.ts').Message, width: number, lines: Li
       return;
     case 'assistant': {
       const content = streamAcc ?? m.content;
-      for (const b of blocksOf(content)) layoutBlock(b, width, lines);
+      for (const b of blocksOf(content)) layoutBlock(b, width, lines, heads);
       return;
     }
   }
 }
 
-function layoutBlock(b: Block, width: number, lines: Line[]): void {
+/** 大纲条目：标题在字符行数组里的下标（绘制时再折算成视觉行）。 */
+interface HeadingMark { title: string; level: number; line: number }
+
+function layoutBlock(b: Block, width: number, lines: Line[], heads?: HeadingMark[]): void {
   switch (b.type) {
     case 'h': {
+      heads?.push({ title: inlineText(b.tokens), level: b.level, line: lines.length });
       const prefix = b.level === 1 ? '◤ ' : b.level === 2 ? '◆ ' : b.level === 3 ? '▸ ' : '· ';
       lines.push({ kind: 'label', text: prefix + inlineText(b.tokens), fg: T().accent, st: ST.BOLD });
       break;
@@ -1280,7 +1331,7 @@ function drawHelp(): void {
   const keys: [string, string][] = [
     ['Enter', '发送消息 / 确认'], ['Shift+Tab', '切换 NORMAL / INSERT'], ['Tab', '切换模式'],
     ['↑ / ↓', '命令历史'], ['⌘B', '切换右侧面板'],
-    ['⌘T / ⌘R', 'Todos / Jobs'], ['⌘E', '上下文面板'],
+    ['⌘T / ⌘R', '侧栏 · 文章 / 大纲'],
     ['⌘N / ⌘K', '新对话 / 命令菜单'], ['⌘P', '参数行'], ['?', '本帮助'],
     ['F11', '全屏'], ['点击宠物', 'poke / tickle 互动'], ['Esc', '关闭弹层'],
   ];
@@ -1466,6 +1517,13 @@ export const UI = {
   launchGeom,
   companionPetRect,
   companionLimits,
+  scrollInfo: (): { top: number; height: number; max: number } | null => scrollGeo,
+  panelRect: (): { x: number; y: number; w: number; h: number } | null => {
+    if (App === null) return null;
+    const P = layout().panel;
+    if (!App.state.panelOpen || P.w <= 0) return null;
+    return { x: P.x * TUI.cw, y: P.y * TUI.ch, w: P.w * TUI.cw, h: P.h * TUI.ch };
+  },
   drawAll,
   drawMessages,
   drawPanel,

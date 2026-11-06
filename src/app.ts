@@ -8,7 +8,7 @@
    - 隐藏输入框（IME / 粘贴）与画布光标同步
    ═══════════════════════════════════════════════════════════ */
 import type {
-  ActionDef, AppApi, AppState, CommandDef, Hit, PanelData, PanelTab,
+  ActionDef, AppApi, AppState, CommandDef, Hit, PanelTab,
   ParamSeg, Session, SessionGroup, SkinDef, Theme, ThemeName,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
@@ -67,7 +67,7 @@ const SKINS: SkinDef[] = [
 const TIPS: readonly string[] = [
   '第一次用 dsh-TUI？花一分钟跑一遍引导，把 API Key、语言、主题、模型一次配好。',
   'Tab 切换 NORMAL / INSERT，Esc 关闭弹层，⌘K 打开命令菜单。',
-  '⌘B 切换右侧面板，⌘T / ⌘R / ⌘E 直接打开 Todos / Jobs / 上下文。',
+  '⌘B 切换右侧面板，⌘T / ⌘R 打开文章列表 / 当前大纲。',
   '点一下宠物随机换一个动作，连点三下会 tickle。',
   '输入 / 开头可以看命令提示；Shift+Enter 换行由浏览器保留。',
 ];
@@ -98,56 +98,10 @@ const state: AppState = {
   hoverId: null,
   skinHover: -1,
   panelTabs: [
-    { id: 'companion', label: '♥' }, { id: 'todos', label: '✓' }, { id: 'jobs', label: '⚙' },
-    { id: 'context', label: '◫' }, { id: 'tips', label: '?' }, { id: 'themes', label: '◐' },
+    { id: 'companion', label: '宠物' }, { id: 'posts', label: '文章' }, { id: 'outline', label: '大纲' },
   ] satisfies PanelTab[],
   panelTab: 'companion',
-  panelData: {
-    todos: [
-      { type: 'head', text: '当前任务' },
-      { type: 'item', text: 'Canvas 真 TUI 架构', status: 'done' },
-      { type: 'item', text: '移植全部像素宠物', status: 'done' },
-      { type: 'item', text: '鲸娘原生像素帧', status: 'running' },
-      { type: 'item', text: '命令菜单交互', status: 'done' },
-      { type: 'hr' },
-      { type: 'item', text: '流式 Markdown 渲染', status: 'done' },
-      { type: 'item', text: 'Mermaid / LaTeX 渲染区', status: 'done' },
-    ],
-    jobs: [
-      { type: 'head', text: '后台任务' },
-      { type: 'item', text: 'whalegirl 图像帧', status: 'done' },
-      { type: 'item', text: '插画序列帧编码', status: 'running' },
-      { type: 'item', text: 'claude-girl 精灵图', status: 'done' },
-      { type: 'hr' },
-      { type: 'item', text: 'Canvas 帧循环调优', status: 'todo' },
-    ],
-    context: [
-      { type: 'head', text: '上下文占用' },
-      { type: 'bar', frac: 0.24, text: '12.8k / 128k' },
-      { type: 'hr' },
-      { type: 'item', text: '当前会话 · 28 条消息', status: 'todo' },
-      { type: 'item', text: '已启用工具：read_file / search', status: 'done' },
-      { type: 'item', text: '宠物互动状态机', status: 'done' },
-    ],
-    tips: [
-      { type: 'head', text: '快捷键提示' },
-      { type: 'item', text: 'Tab 切换 NORMAL / INSERT', status: 'todo' },
-      { type: 'item', text: '⌘K 打开命令菜单', status: 'todo' },
-      { type: 'item', text: '⌘B 切换右侧面板', status: 'todo' },
-      { type: 'item', text: '⌘T / ⌘R 查看 Todos / Jobs', status: 'todo' },
-      { type: 'item', text: '点击宠物可互动', status: 'todo' },
-      { type: 'hr' },
-      { type: 'item', text: 'normal 模式：j/k 滚动、g/G 首尾', status: 'todo' },
-    ],
-    themes: [
-      { type: 'head', text: '主题预览' },
-      { type: 'item', text: 'dark · 雾蓝', status: 'done' },
-      { type: 'item', text: 'light · 浅色', status: 'todo' },
-      { type: 'hr' },
-      { type: 'item', text: '⌘, 打开设置切换主题', status: 'todo' },
-      { type: 'item', text: '上下文条使用 5 段蓝阶', status: 'done' },
-    ],
-  } satisfies PanelData,
+  postsTop: 0,
 
   groups: [],
   sessions: {},
@@ -232,12 +186,9 @@ const COMMANDS: CommandDef[] = [
   { id: 'cmdmenu', label: '⌘ 命令菜单', key: '⌘K', desc: '所有快捷指令', action: 'cmdmenu' },
   { id: 'help', label: '? 快捷键帮助', key: '?', desc: '查看按键说明', action: 'help' },
   { id: 'settings', label: '⚙ 打开设置', key: '⌘,', desc: '主题 / 宠物 / 偏好', action: 'settings' },
-  { id: 'panel-companion', label: '♥ 侧栏伙伴', key: '⌘B', desc: '侧栏宠物 / 戳一戳', action: 'panel:companion' },
-  { id: 'panel-todos', label: '右侧面板 · Todos', key: '⌘T', desc: '切换待办', action: 'panel:todos' },
-  { id: 'panel-jobs', label: '右侧面板 · Jobs', key: '⌘R', desc: '切换任务', action: 'panel:jobs' },
-  { id: 'panel-context', label: '右侧面板 · Context', key: '⌘E', desc: '切换上下文', action: 'panel:context' },
-  { id: 'panel-tips', label: '右侧面板 · Tips', key: '', desc: '切换提示', action: 'panel:tips' },
-  { id: 'panel-themes', label: '右侧面板 · Themes', key: '', desc: '切换主题预览', action: 'panel:themes' },
+  { id: 'panel-companion', label: '♥ 侧栏 · 宠物', key: '⌘B', desc: '侧栏宠物 / 戳一戳', action: 'panel:companion' },
+  { id: 'panel-posts', label: '☰ 侧栏 · 文章列表', key: '⌘T', desc: '全部文章', action: 'panel:posts' },
+  { id: 'panel-outline', label: '≡ 侧栏 · 当前大纲', key: '⌘R', desc: '当前文章标题树', action: 'panel:outline' },
   { id: 'param', label: '⚙ 参数行', key: '⌘P', desc: '调整模型参数', action: 'param' },
   { id: 'theme', label: '◐ 切换主题', key: '', desc: '深色 / 浅色', action: 'theme' },
   { id: 'skin', label: '✿ 切换宠物形象', key: '', desc: '鲸娘 / Claude 娘 / Codex 娘 / 女仆鲸娘', action: 'skin-picker' },
@@ -314,7 +265,7 @@ function buildSeed(): void {
       { type: 'user', content: '把 dsh-blog 重写成 Canvas 真 TUI，保留全部 UI 与交互，并把所有像素宠物都搬进来。' },
       { type: 'think', content: '目标拆解：\n1) 渲染架构：字符网格 buffer + 半块像素精灵，Canvas 逐帧绘制\n2) 宠物盘点：whaleGirl 精灵图 + 女仆系列插画，全部打包为 script 数据\n3) 交互映射：键盘 / 鼠标命中分发到 UI action', open: true, id: 't1' },
       { type: 'tool', tool: { name: 'read_file', status: 'done', statusText: 'tui-core.ts 441 行', body: '像素层 / 字符网格双轨确认\nCOLS / ROWS 自适应，全角字符占宽' } },
-      { type: 'assistant', content: '## 渲染架构设计\n\nCanvas 唯一渲染载体，所有界面元素逐帧绘制：\n\n- **字符网格 buffer**：每个单元存 `{ch, fg, bg, st}`\n- **布局系统**：head / main / composer / status\n- **命中系统**：每帧把可点击区 push 到 `_hits`，鼠标按字符坐标分发\n\n```ts\nTUI.rich(x, y, tokens, fg);          // 富文本排版\nPixelLayer.cells(x, y, cw, ch, rows, palette); // 真像素精灵\n```\n\n> 关键：全部像素宠物共用 `PetKit` 引擎，按 `MOOD_ANIM` 状态机播放。\n\n| 区域 | 职责 |\n|---|---|\n| 顶栏 | 标题 / 模型 / 按钮 |\n| 主区 | 流式 Markdown |\n| 面板 | Todos / Jobs / Context |' },
+      { type: 'assistant', content: '## 渲染架构设计\n\nCanvas 唯一渲染载体，所有界面元素逐帧绘制：\n\n- **字符网格 buffer**：每个单元存 `{ch, fg, bg, st}`\n- **布局系统**：head / main / composer / status\n- **命中系统**：每帧把可点击区 push 到 `_hits`，鼠标按字符坐标分发\n\n```ts\nTUI.rich(x, y, tokens, fg);          // 富文本排版\nPixelLayer.cells(x, y, cw, ch, rows, palette); // 真像素精灵\n```\n\n> 关键：全部像素宠物共用 `PetKit` 引擎，按 `MOOD_ANIM` 状态机播放。\n\n| 区域 | 职责 |\n|---|---|\n| 顶栏 | 标题 / 模型 / 按钮 |\n| 主区 | 流式 Markdown |\n| 面板 | 宠物 / 文章 / 大纲 |' },
       { type: 'usage', content: 'context: 12.8k/128k tokens' },
     ],
   };
@@ -473,6 +424,10 @@ function togglePanel(tab?: string): void {
   state.panelOpen = true;
   state.panelTab = tab;
   if (tab !== 'companion') resetCompanion();
+  if (tab === 'posts') {
+    const idx = state.session === null ? -1 : POSTS.findIndex(p => p.id === state.session?.id);
+    state.postsTop = idx >= 0 ? Math.max(0, idx - 2) : 0;
+  }
 }
 
 function toggleOverlay(ov: AppState['overlay']): void {
@@ -582,6 +537,11 @@ function dispatch(action: string | null): void {
     case 'panel': togglePanel(rest); return;
     case 'think': toggleThink(rest); return;
     case 'poptune': paramAdjust(rest); return;
+    case 'outline': {
+      const row = Number(rest);
+      if (Number.isFinite(row)) { state.scroll = Math.max(0, row); state.userScrolled = true; }
+      return;
+    }
     case 'cmd': runCommand(rest); return;
     case 'skinsel': applySkin(rest); state.overlay = null; return;
     default: break;
@@ -732,9 +692,8 @@ function onKey(e: KeyboardEvent): void {
   if (meta && k.toLowerCase() === 'j') { continueLast(); e.preventDefault(); return; }
   if (meta && k.toLowerCase() === 'b') { togglePanel(); e.preventDefault(); return; }
   if (meta && k.toLowerCase() === 'p') { toggleOverlay('param'); state.paramSel = 0; e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 't') { togglePanel('todos'); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'r') { togglePanel('jobs'); e.preventDefault(); return; }
-  if (meta && k.toLowerCase() === 'e') { togglePanel('context'); e.preventDefault(); return; }
+  if (meta && k.toLowerCase() === 't') { togglePanel('posts'); e.preventDefault(); return; }
+  if (meta && k.toLowerCase() === 'r') { togglePanel('outline'); e.preventDefault(); return; }
   if (meta && k.toLowerCase() === 'o') { setScreen('settings'); e.preventDefault(); return; }
   if (k === 'F11') { toggleFullscreen(); e.preventDefault(); return; }
 
@@ -960,6 +919,17 @@ interface DragBase { px: number; py: number; x: number; y: number }
 let dragBase: DragBase | null = null;
 /** 侧栏边界拖拽中。 */
 let resizing = false;
+/** 正在拖动正文滚动条。 */
+let scrollDrag = false;
+
+/** 滚动条拖拽：按指针在轨道里的位置映射到滚动行。 */
+function applyScrollDrag(py: number): void {
+  const info = UI.scrollInfo();
+  if (info === null) return;
+  const frac = Math.max(0, Math.min(1, (py - info.top) / Math.max(1, info.height)));
+  state.scroll = Math.round(frac * info.max);
+  state.userScrolled = true;
+}
 
 /** 侧栏调宽：边界跟手（col = 指针所在字符列，面板贴右）。 */
 function applyPanelResize(col: number): void {
@@ -1015,6 +985,7 @@ function onDown(col: number, row: number, _btn: number, e: MouseEvent): void {
     if (col >= h.x && col < h.x + h.w && row >= h.y && row < h.y + h.h) {
       if (h.action !== null && h.action.startsWith('petside:')) { startPetDrag(e); return; }
       if (h.action === 'panelresize' && state.overlay === null) { resizing = true; applyPanelResize(col); return; }
+      if (h.action === 'scroll-drag') { scrollDrag = true; applyScrollDrag(e.clientY); return; }
       dispatch(h.action);
       return;
     }
@@ -1061,14 +1032,17 @@ function onMove(px: number, py: number): void {
     lastActivity = now();
   }
   const grab = dragBase !== null;
+  if (scrollDrag) applyScrollDrag(py);
   const resizeCursor = resizing || state.panelResizeHover;
+  const scrollCursor = scrollDrag || state.hoverId === 'scrollbar';
   document.body.style.cursor = resizeCursor
     ? 'col-resize'
-    : (grab ? 'grabbing' : (state.petHover ? 'grab' : (overClickable ? 'pointer' : 'text')));
+    : (scrollDrag ? 'grabbing' : (scrollCursor ? 'grab' : (grab ? 'grabbing' : (state.petHover ? 'grab' : (overClickable ? 'pointer' : 'text')))));
 }
 
 function onUp(_col: number, _row: number, _btn: number, e: MouseEvent): void {
   if (resizing) { resizing = false; savePanelCols(); return; }
+  if (scrollDrag) { scrollDrag = false; return; }
   endPetDrag(e, true);
 }
 
@@ -1077,6 +1051,7 @@ function onLeave(): void {
   state.panelResizeHover = false;
   state.hoverId = null;
   resizing = false;
+  scrollDrag = false;
   if (dragBase !== null) {
     dragBase = null;
     state.petDragging = false;
@@ -1092,6 +1067,15 @@ function onWheel(dy: number): void {
   }
   if (state.overlay !== null) return;
   if (state.screen !== 'chat') return;
+  // 指针在侧栏「文章」列表上时滚列表，不滚正文
+  if (state.panelOpen && state.panelTab === 'posts') {
+    const pr = UI.panelRect();
+    const m = TUI.Input.lastMouse;
+    if (pr !== null && m.x >= pr.x && m.x < pr.x + pr.w && m.y >= pr.y && m.y < pr.y + pr.h) {
+      state.postsTop = Math.max(0, state.postsTop + (dy > 0 ? 1 : -1));
+      return;
+    }
+  }
   const delta = dy > 0 ? 3 : -3;
   state.scroll = Math.max(0, state.scroll + delta);
   state.userScrolled = true;

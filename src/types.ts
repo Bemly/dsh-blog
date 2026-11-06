@@ -320,16 +320,6 @@ export type Overlay = 'help' | 'cmdmenu' | 'param' | 'sessions' | 'kernel' | 'cw
 export type Mode = 'insert' | 'normal';
 export type ItemStatus = 'done' | 'running' | 'todo' | 'error';
 
-/** 侧栏 / 面板的一行。 */
-export type PanelRow =
-  | { type: 'head'; text: string }
-  | { type: 'hr' }
-  | { type: 'item'; text: string; status: ItemStatus; gap?: boolean }
-  | { type: 'bar'; frac: number; text: string; gap?: boolean };
-
-/** 面板数据表。 */
-export type PanelData = Record<string, PanelRow[]>;
-
 /** 面板 tab。 */
 export interface PanelTab {
   id: string;
@@ -433,7 +423,8 @@ export interface AppState {
   skinHover: number;
   panelTabs: PanelTab[];
   panelTab: string;
-  panelData: PanelData;
+  /** 文章列表面板的滚动起点（行）。 */
+  postsTop: number;
   groups: SessionGroup[];
   sessions: Record<string, Session>;
   session: Session | null;
