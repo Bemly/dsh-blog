@@ -24,10 +24,6 @@ jobs:
         with:
           bun-version: latest
 
-      # blog:build 需要 ffprobe 读图片尺寸；非 AVIF 图会用到 avifenc
-      - name: Install image tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libavif-bin
-
       - run: bun install --frozen-lockfile
 
       # posts.ts 不进仓库，构建时从 blog/ 现场生成

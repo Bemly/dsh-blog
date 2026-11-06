@@ -53,8 +53,9 @@ bun install → bun run build（内含 blog:build）→ 上传 dist/ → deploy-
 产物里的路径都是相对的（`./chunk-*.js`、`assets/…`、`blog/…`），所以部署在
 `/dsh-blog/` 这样的子路径下也能直接用，不需要改 base。
 
-> CI 里用 `apt-get install ffmpeg libavif-bin` 提供 `ffprobe` / `avifenc`：
-> `blog:build` 要用前者读尺寸，遇到非 AVIF 图才会用后者转码。
+> CI 不装额外的图像工具：`blog:build` 直接读 AVIF 文件的 `ispe` 头拿宽高。
+> 如果往 `blog/` 里放了 PNG/JPEG，先在本地跑一次 `bun run blog:build`（需要
+> `avifenc`）把图转成 AVIF 再提交。
 
 ## 目录
 

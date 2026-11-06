@@ -44,14 +44,7 @@ function readConfig(): BlogConfig {
   };
 }
 
-function probe(file: string): [number, number] {
-  const p = Bun.spawnSync(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
-    '-show_entries', 'stream=width,height', '-of', 'csv=p=0', file]);
-  const [w, h] = p.stdout.toString().trim().split(',').map(Number);
-  return [w ?? 0, h ?? 0];
-}
-
-/** 直接从 AVIF 的 ispe box 读宽高：省掉 587 次 ffprobe 进程启动。 */
+/** 直接从 AVIF 的 ispe box 读宽高，不依赖 ffprobe。 */
 function avifSize(buf: Uint8Array): [number, number] {
   let best: [number, number] = [0, 0];
   for (let i = 0; i + 16 <= buf.length; i++) {
@@ -66,12 +59,11 @@ function avifSize(buf: Uint8Array): [number, number] {
   return best;
 }
 
+/** 尺寸读取：读不到就报错，CI 里不需要 ffprobe。 */
 function sizeOf(file: string): [number, number] {
-  if (extname(file).toLowerCase() === '.avif') {
-    const size = avifSize(new Uint8Array(readFileSync(file)));
-    if (size[0] > 0) return size;
-  }
-  return probe(file);
+  const size = avifSize(new Uint8Array(readFileSync(file)));
+  if (size[0] > 0) return size;
+  throw new Error('读不到图片尺寸（请先转成 AVIF）：' + file);
 }
 
 function encode(src: string, cfg: BlogConfig): string {
