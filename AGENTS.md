@@ -17,6 +17,7 @@ bun run build          # → dist/（含 assets 拷贝）
 bun run preview        # 预览 dist/
 
 bun run encode:sheet <skin> <源目录> [缩放|WxH=1] [alphaQ=60]
+bun run blog:build                             # blog/ → src/data/posts.ts
 ```
 
 ## 提交与推送（硬性）
@@ -83,21 +84,28 @@ src/data/timings.ts                     # anim-key → 每帧时长数组（ms�
 
 ## 书签文章（灌成会话）
 
-文章来自仓库外的 Obsidian 目录（书签 · NAS 与自建服务），启动时由 `app.ts` 的
-`seedPosts()` 灌成普通会话（分组「书签 · NAS与自建服务」）——**不要再为它单独写屏幕**，
-正文就走 `assistant` 消息的 Markdown 渲染。只提交生成物：
+文章内容放在仓库根的 `blog/`：一篇一个文件夹，Markdown 与配图同目录。
 
-```bash
-bun run import:blog <源目录> [限制篇数]     # 断点续传：已有 .avif 会跳过
+```
+blog/blog.config.json     标题 / 入口文件 / 图片目录 / exclude / AVIF 参数
+blog/<序号>/index.md      正文（图片写成 images/xxx.avif）
+blog/<序号>/images/*.avif 配图
 ```
 
-- 产出：`src/data/posts.ts`（标题 / 摘要 / 正文 Markdown）+ `assets/blog/<序号>/iNN-*.avif`；
-- 图片统一 `avifenc -q 60 --qalpha 60 -s 0`；GIF / WebP / 伪扩展名先经 ffmpeg 转 PNG，
-  PNG/JPEG 直接编码，失败再回退转码；
-- `posts.ts` 与 `assets/blog/` 都是生成物，**不要手改**，要改就改导入脚本再重跑；
-- 导入时剔除 YAML frontmatter（`AIGC:` 标签块）和「内容由 AI 生成」免责声明行，
-  别让它们出现在正文里；
-- 消息里只画 `assets/` 下的图：跨域图会污染 canvas，导致整个像素层 `getImageData` 抛异常；
+启动时由 `app.ts` 的 `seedPosts()` 灌成普通会话（分组名取配置的 `title`）——
+**不要再为它单独写屏幕**，正文就走 `assistant` 消息的 Markdown 渲染。生成数据：
+
+```bash
+bun run blog:build         # 扫描 blog/ → src/data/posts.ts（自动识别目录）
+```
+
+- 只提交 `blog/`（内容）与生成物 `src/data/posts.ts`；`posts.ts` 不要手改，改完内容重跑脚本；
+- 图片目录里非 AVIF 的图会按 `blog.config.json` 的 `image` 参数就地转码
+  （`-q 60 --qalpha 60 -s 0`），正文引用自动改成 AVIF；
+- 整理内容时已剔除 YAML frontmatter（`AIGC:` 标签块）、「内容由 AI 生成」声明行，
+  并删除所有带 emoji 的标题行（`## 📎 链接` 之类），保持正文干净；
+- 消息里只画 `assets/` 与 `blog/` 下的图：跨域图会污染 canvas，导致像素层
+  `getImageData` 抛异常；
 - Markdown 解析结果按内容缓存（最近 6 条），正文解析不能每次绘制都重跑。
 
 ## 验证清单

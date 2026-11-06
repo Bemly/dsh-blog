@@ -14,7 +14,7 @@ import type {
 import { TUI } from './tui-core.ts';
 import { UI } from './tui-ui.ts';
 import { PetKit } from './pet.ts';
-import { POSTS } from './data/posts.ts';
+import { POSTS, BLOG_TITLE } from './data/posts.ts';
 
 const now = (): number => Date.now();
 
@@ -351,7 +351,7 @@ function buildSeed(): void {
 /** 把书签文章灌成会话：点击就是普通的 TUI 对话（正文走 assistant 消息渲染）。 */
 function seedPosts(): void {
   if (POSTS.length === 0) return;
-  const group: SessionGroup = { name: '书签 · NAS与自建服务', sessions: [] };
+  const group: SessionGroup = { name: BLOG_TITLE, sessions: [] };
   for (const p of POSTS) {
     const id = 'post-' + p.no;
     state.sessions[id] = {
@@ -359,7 +359,7 @@ function seedPosts(): void {
       title: p.title,
       time: p.date !== '' ? new Date(p.date + 'T00:00:00') : new Date(),
       messages: [
-        { type: 'system', content: '收录于 ' + (p.date || '未记录') + ' · 书签 · NAS与自建服务' },
+        { type: 'system', content: '收录于 ' + (p.date || '未记录') + ' · ' + BLOG_TITLE },
         // 正文首行是重复的「# 标题」，顶栏已经显示，去掉
         { type: 'assistant', content: p.body.replace(/^#\s+.*\n+/, '') },
       ],

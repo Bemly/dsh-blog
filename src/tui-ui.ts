@@ -825,8 +825,8 @@ function layoutBlock(b: Block, width: number, lines: Line[]): void {
       break;
     }
     case 'image': {
-      // 只画站内图片：外链图会污染 canvas（跨域读回），降级成一行文字
-      if (!b.src.startsWith('assets/')) {
+      // 只画站内图片（assets/ 与 blog/）：外链图会污染 canvas（跨域读回），降级成一行文字
+      if (!b.src.startsWith('assets/') && !b.src.startsWith('blog/')) {
         lines.push({ kind: 'label', text: `🖼 ${b.alt || b.src}`, fg: T().dim });
         break;
       }

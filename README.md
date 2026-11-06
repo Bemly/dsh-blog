@@ -22,9 +22,10 @@ bun run dev        # http://127.0.0.1:8899/
 
 ```bash
 bun run typecheck  # tsc --noEmit（strict，零告警）
-bun run build      # index.html → dist/（含 assets 拷贝）
+bun run build      # index.html → dist/（含 assets/、blog/ 拷贝）
 bun run preview    # 预览 dist/（http://127.0.0.1:8899/）
 bun run check      # typecheck + build
+bun run blog:build # 扫描 blog/，生成 src/data/posts.ts
 ```
 
 > 因为入口是 ES module，`file://` 直接双击 `index.html` 不再可用（浏览器会拦
@@ -36,10 +37,10 @@ bun run check      # typecheck + build
 ```
 index.html              入口：一块 canvas（字符网格）+ 一个 <script type="module">
 serve.ts                开发服务器：Bun.serve + Bun.Transpiler 现场转译 .ts
-build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/
+build.ts                生产构建：Bun.build(index.html) + 拷贝 assets/、blog/
 preview.ts              预览 dist/
 tools/encode-sheet.ts   逐帧 WebP → AVIF 精灵图（ffmpeg + avifenc）
-tools/import-blog.ts    Obsidian 书签目录 → posts.ts + assets/blog（图片转 AVIF）
+tools/build-blog.ts     扫描 blog/ → src/data/posts.ts（按 blog.config.json）
 tsconfig.json           strict / noUnusedLocals / 等
 src/
   main.ts               入口：找 #tui canvas → start()
@@ -62,7 +63,10 @@ assets/
   whale-maid-anime-sheet/ 鲸娘女仆动画精灵图（22 张 / 880 帧，540×540）
   whale-maid-plush-sheet/ 鲸娘女仆毛绒精灵图（22 张 / 348 帧，630×819）
   portraits/            高清立绘：whale-girl（女仆鲸娘，normal + happy）
-  blog/                 文章配图：<序号>/iNN-<原名>.avif（q60，-s 0）
+blog/
+  blog.config.json      文章目录配置：标题 / 入口文件 / 图片目录 / 排除项 / 编码参数
+  <序号>/index.md       文章 Markdown（图片用相对路径 images/xxx.avif）
+  <序号>/images/*.avif  正文配图（q60 · -s 0）
 ```
 
 ## 角色形象（原版搬运，可在设置里选）
@@ -156,28 +160,36 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 
 ## 书签文章（会话）
 
-133 篇「书签 · NAS 与自建服务」的笔记在启动时被灌成普通会话，分组名就是
-`书签 · NAS与自建服务`——没有单独的阅读界面，选中就是现有的 TUI 对话框：
-顶栏显示标题，第一行是 system 提示「收录于 …」，正文由 assistant 消息按
-Markdown 逐块渲染，配图就地铺在消息流里。
+文章内容现在独立放在仓库根的 `blog/` 目录：每篇一个文件夹，Markdown 与配图同处一室。
 
-- 入口：`⌘J` 继续最近，或 `⌘K` →「会话与工作区」/ 启动页「会话与工作区」；
-- 会话列表支持 `↑↓ / j k`、`PageUp/PageDown`、`Home/End`、鼠标滚轮，选中 `Enter` 打开；
-- 正文首行重复的 `# 标题` 在灌入时去掉，避免和顶栏重复；
-- 图片按消息区宽度铺满、最高 40 行；滚到视口边缘时按行**裁源图**（不会压扁）；外链图（http/https）降级成
-  `🖼 alt` 文字——跨域图会污染 canvas，之后所有 `getImageData` 都会抛 SecurityError；
-- Markdown 解析结果按内容缓存（最近 6 条），图片懒加载后请求重绘。
-
-素材管线（源目录在仓库外，只提交生成物）：
-
-```bash
-bun run import:blog <源目录> [限制篇数]     # 图片统一 AVIF q60 · -s 0
+```
+blog/
+  blog.config.json      标题 / 入口文件 / 图片目录 / 排除项 / AVIF 编码参数
+  001/index.md          正文（图片引用写成 images/xxx.avif）
+  001/images/*.avif     配图
+  ...
 ```
 
-图片输出到 `assets/blog/<序号>/iNN-<原名>.avif`，正文引用同步改写；GIF / WebP /
-伪扩展名（.png 实为 ico、.jpg 实为 webp）会先用 ffmpeg 转 PNG 再编码；YAML frontmatter
-（Obsidian 的 `AIGC:` 标签块）与「内容由 AI 生成」的免责声明行都在导入时剔除。
-已有输出会跳过，中断后重跑可续传。
+- 133 篇在启动时由 `seedPosts()` 灌成普通会话，分组名取配置里的 `title`——没有单独的
+  阅读界面，选中就是现有的 TUI 对话框：顶栏标题、system 行「收录于 …」、正文走
+  assistant 消息的 Markdown 渲染，配图就地铺在消息流；
+- 入口：`⌘J` 继续最近，或 `⌘K` →「会话与工作区」/ 启动页「会话与工作区」；
+- 会话列表支持 `↑↓ / j k`、`PageUp/PageDown`、`Home/End`、鼠标滚轮，选中 `Enter` 打开；
+- 正文首行重复的 `# 标题` 在灌入时去掉；带 emoji 的标题（`## 📎 链接` 之类）在整理
+  内容时整行删除；
+- 图片按消息区宽度铺满、最高 40 行；滚到视口边缘时按行**裁源图**（不会压扁），后续
+  文字从图片之后开始；外链图（http/https）降级成 `🖼 alt` 文字——跨域图会污染 canvas；
+- Markdown 解析结果按内容缓存（最近 6 条），图片懒加载后请求重绘。
+
+添加/修改文章：往 `blog/` 里丢一个文件夹（`index.md` + `images/`），或在配置里用
+`exclude` 排除，然后重建数据：
+
+```bash
+bun run blog:build      # 扫描 blog/ → src/data/posts.ts
+```
+
+非 AVIF 图片会按 `blog.config.json` 的 `image` 参数（`q 60 / qalpha 60 / -s 0`）就地
+转码，正文引用自动改写。`posts.ts` 是生成物，不要手改。
 
 ## 交互
 ## 交互

@@ -10,7 +10,7 @@
     "build": "bun run build.ts",
     "preview": "bun run preview.ts",
     "encode:sheet": "bun run tools/encode-sheet.ts",
-    "import:blog": "bun run tools/import-blog.ts",
+    "blog:build": "bun run tools/build-blog.ts",
     "typecheck": "tsc --noEmit",
     "check": "bun run typecheck && bun run build"
   },

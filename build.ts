@@ -22,4 +22,5 @@ if (!result.success) {
 }
 
 await cp(`${import.meta.dir}/assets`, `${outdir}/assets`, { recursive: true });
+await cp(`${import.meta.dir}/blog`, `${outdir}/blog`, { recursive: true });
 console.log('build ok →', outdir);

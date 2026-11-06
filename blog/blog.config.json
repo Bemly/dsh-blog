@@ -1,0 +1,13 @@
+{
+  "title": "书签 · NAS 与自建服务",
+  "description": "NAS / 软路由 / 自建服务的书签与笔记",
+  "entry": "index.md",
+  "images": "images",
+  "exclude": [],
+  "image": {
+    "format": "avif",
+    "quality": 60,
+    "alphaQuality": 60,
+    "speed": 0
+  }
+}

@@ -40,7 +40,7 @@ export interface Post {
   /** 收录日期（YYYY-MM-DD，没有则为空串）。 */
   readonly date: string;
   readonly excerpt: string;
-  /** Markdown 正文，图片路径已改写为 assets/blog/<no>/… */
+  /** Markdown 正文，图片路径已改写为 blog/<序号>/images/… */
   readonly body: string;
 }
 
