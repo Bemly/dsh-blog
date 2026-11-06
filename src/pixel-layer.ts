@@ -135,6 +135,22 @@ function imageSmooth(img: HTMLImageElement, x: number, y: number, w: number, h: 
   ctx.imageSmoothingEnabled = false;
 }
 
+/** 视频帧：同上，源尺寸取 videoWidth/Height（alpha 由视频解码器给出）。 */
+function videoAt(v: HTMLVideoElement, x: number, y: number, w: number, h: number): void {
+  if (ctx === null || !v) return;
+  const sw = v.videoWidth;
+  const sh = v.videoHeight;
+  if (!sw || !sh) return;
+  const dx = D(x);
+  const dy = D(y);
+  const dw = Math.max(1, D(x + w) - dx);
+  const dh = Math.max(1, D(y + h) - dy);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(v, 0, 0, sw, sh, dx, dy, dw, dh);
+  ctx.imageSmoothingEnabled = false;
+}
+
 /**
  * 字符网格像素画（半块原味：1 源像素 = cw × ch/2）。
  * rows 既可以是字符串行（字符 = palette 键），也可以是「每格颜色/null」的数组行。
@@ -168,6 +184,7 @@ export const PixelLayer: PixelLayerApi = {
   imageSub,
   imageSubSmooth,
   imageSmooth,
+  videoAt,
   cells,
   rect,
 };

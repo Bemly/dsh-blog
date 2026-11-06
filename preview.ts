@@ -12,6 +12,8 @@ const MIME: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.webp': 'image/webp',
   '.avif': 'image/avif',
+  '.webm': 'video/webm',
+  '.mp4': 'video/mp4',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
 };

@@ -85,6 +85,17 @@ src/data/timings.ts                     # anim-key → 每帧时长数组（ms�
   否则非整数倍缩放会锯齿；
 - alpha 档位：像素画 60 够用，软边插画要 85 起步，60 会有明显脏边。
 
+### 视频轨（VP9 alpha）
+
+`whale-maid-video` 不走精灵图：一个动画一个 `assets/whale-maid-video/<key>.webm`，
+720×1280 / 24fps / 97 帧，`-c:v libvpx-vp9 -pix_fmt yuva420p -crf 36 -b:v 0 -row-mt 1 -auto-alt-ref 0`。
+
+- **`<video>` 可以逐帧画进 canvas**，动图 AVIF/WebP/GIF 不行——这两件事别混；
+- **只有 VP8/VP9 单文件带 alpha 且 Chromium + Firefox 都保留**；Safari 静默丢 alpha；
+- 播放由 `pet.ts` 的 video 分支接管：心情循环、点击播一轮、拖拽循环，最多 4 个解码器（LRU）；
+- 换素材要同步三处：`assets/whale-maid-video/`、`pet.ts` 的 `VIDEOS`、`app.ts` 的 `SKINS`；
+- 改完记得给 `serve.ts` / `preview.ts` 的 MIME 表补 `.webm`。
+
 ## 书签文章（灌成会话）
 
 文章内容放在仓库根的 `blog/`：一篇一个文件夹，Markdown 与配图同目录。
@@ -148,3 +159,7 @@ bun run blog:build         # 扫描 blog/ → src/data/posts.ts（自动识别�
 12. 新增静态资源后缀记得在 `serve.ts` / `preview.ts` 的 MIME 表里登记（`.avif` 就是这么补的）。
 13. 换肤/换素材后要同步三处：`assets/<skin>-sheet/`、`src/data/timings.ts`、`src/app.ts` 的 `SKINS`
     （以及 `src/pet.ts` 的 `SHEETS`），少一处就会出现「选得到但画不出」。
+14. **视频轨不能用 `canPlayType` 判断 alpha**：Safari 对 WebM VP9 返回 `"probably"` 但把透明区
+    画成黑底。要验证就 `drawImage(video)` 后读角落像素。
+15. 视频解码器是有上限的资源（Chrome 同时活跃的解码器只有几个）：`pet.ts` 用 LRU 只留 4 个，
+    不要为 22 个动画各建一个 `<video>` 常驻。

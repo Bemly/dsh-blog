@@ -62,6 +62,7 @@ const SKINS: SkinDef[] = [
   { id: 'whale-maid', label: '鲸娘 · 女仆 Q版', kind: '插画序列帧', desc: '22 个动画 / 384 帧 · 489×709' },
   { id: 'whale-maid-anime', label: '鲸娘 · 女仆 动画', kind: '插画序列帧', desc: '22 个动画 / 880 帧 · 540×540' },
   { id: 'whale-maid-plush', label: '鲸娘 · 女仆 毛绒', kind: '插画序列帧', desc: '22 个动画 / 348 帧 · 630×819' },
+  { id: 'whale-maid-video', label: '鲸娘 · 大肥鱼', kind: '视频序列帧', desc: '22 个动画 / 2134 帧 · 720×1280 VP9' },
 ];
 
 const TIPS: readonly string[] = [

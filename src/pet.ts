@@ -18,7 +18,7 @@
    ═══════════════════════════════════════════════════════════ */
 import type {
   AnimFrame, Pet, PetKitApi, PetPack, PixelLayerApi,
-  PortraitArt, SheetArt, SheetFrame, SkinId,
+  PortraitArt, SheetArt, SheetFrame, SkinId, VideoArt,
 } from './types.ts';
 import { TUI } from './tui-core.ts';
 import { WHALEGIRL } from './data/whalegirl.ts';
@@ -38,6 +38,26 @@ const SHEETS: Record<string, SheetArt> = {
   'whale-maid-plush': { dir: 'assets/whale-maid-plush-sheet/', cell: [630, 819], timings: PLUSH_IMG, smooth: true },
 };
 const PT_DIR = 'assets/portraits/';
+
+/**
+ * 视频素材轨：一个动画一个 VP9 alpha WebM（720×1280 / 24fps / 97 帧 / CRF 36）。
+ * 帧间压缩比精灵图小 5 倍，代价是必须用 <video> 解码后逐帧 drawImage 到像素层
+ * ——canvas 只能取动图首帧，但 video 元素的帧是可以画的。
+ */
+const VIDEOS: Record<string, VideoArt> = {
+  'whale-maid-video': {
+    dir: 'assets/whale-maid-video/',
+    size: [720, 1280],
+    frames: 97,
+    fps: 24,
+    poster: 'poster.avif',
+    keys: [
+      'idle', 'idle-look', 'idle-spout', 'thinking', 'typing', 'music', 'conducting',
+      'building', 'error', 'happy', 'notification', 'compacting', 'carrying', 'sleeping',
+      'waking', 'poke-left', 'poke-right', 'tickle', 'drag', 'swim', 'smile-hearts', 'thumbs-up',
+    ],
+  },
+};
 
 /** 高清立绘（真图）：只剩女仆鲸娘——她没有动画帧，保持静态 */
 const PORTRAITS: Record<string, PortraitArt> = {
@@ -75,6 +95,10 @@ const HAPPY_MS = 3000;
 function pack(skin: SkinId): PetPack {
   const portrait = PORTRAITS[skin];
   if (portrait !== undefined) return { type: 'portrait', art: portrait, size: [0, 0] };
+  const video = VIDEOS[skin];
+  if (video !== undefined) {
+    return { type: 'video', video, size: [video.size[0], video.size[1]] };
+  }
   const sheet = SHEETS[skin];
   if (sheet !== undefined) {
     // 鲸娘额外带一份 42×30 字符格帧包，作图像未就绪时的回落
@@ -187,6 +211,96 @@ function portraitImage(key: string, which: 'normal' | 'happy'): PortraitRec | nu
   return rec;
 }
 
+// ── 视频素材（VP9 alpha）：懒创建 + LRU 限量 ────────────────
+interface VideoRec {
+  el: HTMLVideoElement;
+  ready: boolean;
+  bad: boolean;
+  used: number;
+}
+
+/** 同时保留的解码器上限：动画切换频繁，但没必要让 22 个视频都占着解码器。 */
+const VIDEO_MAX_LIVE = 4;
+const videoRecs: Record<string, VideoRec> = Object.create(null) as Record<string, VideoRec>;
+let videoClock = 0;
+
+function videoRec(art: VideoArt, key: string): VideoRec {
+  const id = `${art.dir}${key}`;
+  const hit = videoRecs[id];
+  if (hit !== undefined) { hit.used = ++videoClock; return hit; }
+  // 回收最久没用的（当前正在播的刚更新过 used，不会被选中）
+  const ids = Object.keys(videoRecs);
+  if (ids.length >= VIDEO_MAX_LIVE) {
+    ids.sort((a, b) => (videoRecs[a]?.used ?? 0) - (videoRecs[b]?.used ?? 0));
+    for (const old of ids.slice(0, ids.length - VIDEO_MAX_LIVE + 1)) {
+      const rec = videoRecs[old];
+      if (rec === undefined) continue;
+      rec.el.pause();
+      rec.el.removeAttribute('src');
+      rec.el.load();
+      delete videoRecs[old];
+    }
+  }
+  const el = document.createElement('video');
+  el.muted = true;
+  el.playsInline = true;
+  el.preload = 'auto';
+  el.setAttribute('playsinline', '');
+  el.loop = true;
+  const rec: VideoRec = { el, ready: false, bad: false, used: ++videoClock };
+  el.addEventListener('loadeddata', () => { rec.ready = true; });
+  el.addEventListener('error', () => { rec.bad = true; });
+  el.src = `${art.dir}${key}.webm`;
+  videoRecs[id] = rec;
+  return rec;
+}
+
+/** 视频解码前的占位图（首帧）。 */
+const posterCache: Record<string, HTMLImageElement> = Object.create(null) as Record<string, HTMLImageElement>;
+function posterFor(art: VideoArt): HTMLImageElement | null {
+  if (art.poster === undefined) return null;
+  const url = art.dir + art.poster;
+  const hit = posterCache[url];
+  if (hit !== undefined) return hit;
+  const img = new Image();
+  img.src = url;
+  posterCache[url] = img;
+  return img;
+}
+
+/** 视频预取：只 fetch 暖 HTTP 缓存，不建解码器（并发 2、空闲才发）。 */
+const videoQueue: string[] = [];
+const videoQueued = new Set<string>();
+const videoFetched = new Set<string>();
+let videoFetching = 0;
+
+function pumpVideoPrefetch(): void {
+  while (videoFetching < 2) {
+    const url = videoQueue.shift();
+    if (url === undefined) return;
+    videoQueued.delete(url);
+    videoFetching += 1;
+    void fetch(url)
+      .then(r => r.arrayBuffer())
+      .catch(() => { /* 失败就按需再取 */ })
+      .finally(() => {
+        videoFetched.add(url);
+        videoFetching -= 1;
+        idleRun(pumpVideoPrefetch);
+      });
+  }
+}
+
+function prefetchVideo(art: VideoArt): void {
+  for (const key of art.keys) {
+    const url = `${art.dir}${key}.webm`;
+    if (videoFetched.has(url) || videoQueued.has(url)) continue;
+    videoQueued.add(url);
+    videoQueue.push(url);
+  }
+  idleRun(pumpVideoPrefetch);
+}
+
 // ── 播放器 ─────────────────────────────────────────────────
 interface AnimBankEntry {
   frames: AnimFrame[];
@@ -212,17 +326,25 @@ export class Player implements Pet {
   private clicks: number[] = [];
   private portraitKey = '';
   private sheet: SheetArt | null;
+  private video: VideoArt | null;
+  private videoKey = '';
+  private poster: HTMLImageElement | null = null;
 
   constructor(skin: SkinId) {
     this.skin = skin;
     this.pack = pack(skin);
     this.sheet = this.pack.sheet ?? null;
+    this.video = this.pack.video ?? null;
     if (this.pack.type === 'sheet') {
       for (const a of this.pack.anims ?? []) {
         this.anims[a.key] = { frames: a.frames, total: a.frames.reduce((s, f) => s + f.dur, 0) };
       }
     }
     if (this.sheet !== null) imageAnim(this.sheet, 'idle'); // 首屏预载
+    if (this.video !== null) {
+      this.poster = posterFor(this.video);
+      videoRec(this.video, 'idle');
+    }
     if (this.pack.type === 'portrait') {
       for (const key of Object.keys(PORTRAITS)) {
         if (PORTRAITS[key] === this.pack.art) { this.portraitKey = key; break; }
@@ -235,6 +357,13 @@ export class Player implements Pet {
     if (this.mood === mood) return;
     this.mood = mood;
     const key = MOOD_ANIM[mood] ?? 'idle';
+    if (this.video !== null) {
+      if (this.video.keys.includes(key) && this.animKey !== key) {
+        this.animKey = key;
+        this.animStart = this.time;
+      }
+      return;
+    }
     if (this.sheet !== null) {
       if (this.sheet.timings[key] !== undefined && this.animKey !== key) {
         this.animKey = key;
@@ -255,7 +384,7 @@ export class Player implements Pet {
       portraitImage(this.portraitKey, 'happy');
       return;
     }
-    if (this.pack.type !== 'sheet') return;
+    if (this.pack.type !== 'sheet' && this.pack.type !== 'video') return;
     const t = this.time;
     this.clicks = this.clicks.filter(x => x > t - TICKLE_WINDOW_MS);
     this.clicks.push(t);
@@ -270,15 +399,23 @@ export class Player implements Pet {
       this.override = { key, start: t, until: t + dur };
     }
     if (this.sheet !== null && this.override !== null) imageAnim(this.sheet, this.override.key);
+    // 视频：同一个动作连点也要从头重播
+    if (this.video !== null) this.videoKey = '';
   }
 
   /** 可随机触发的动作：去掉静止 idle 与拖拽 drag。 */
   private reactionPool(): string[] {
+    if (this.video !== null) return this.video.keys.filter(k => !CLICK_EXCLUDE.has(k));
     return Object.keys(this.sheet?.timings ?? {}).filter(k => !CLICK_EXCLUDE.has(k));
   }
 
   /** 一个动作完整播一轮的时长（ms）。 */
   private keyDuration(key: string): number {
+    if (this.video !== null) {
+      const d = videoRec(this.video, key).el.duration;
+      if (Number.isFinite(d) && d > 0) return d * 1000;
+      return (this.video.frames / this.video.fps) * 1000;
+    }
     if (this.sheet !== null) {
       const durs = this.sheet.timings[key];
       if (durs !== undefined) return durs.reduce((s, d) => s + d, 0);
@@ -292,6 +429,7 @@ export class Player implements Pet {
     if (on) {
       this.override = { key: 'drag', start: this.time, until: Number.POSITIVE_INFINITY };
       if (this.sheet !== null) imageAnim(this.sheet, 'drag');
+      if (this.video !== null) this.videoKey = '';
       return;
     }
     if (this.override !== null && this.override.key === 'drag') this.override = null;
@@ -354,6 +492,22 @@ export class Player implements Pet {
     return normal !== null && normal.ok ? normal.img : null;
   }
 
+  /**
+   * 视频轨：动作变了就换片源（回到开头播放）。
+   * 心情动画循环；点击反应播一轮；拖拽姿态按住期间循环。
+   */
+  private syncVideo(): void {
+    const art = this.video;
+    if (art === null) return;
+    const key = this.currentKey();
+    if (key === this.videoKey) return;
+    const rec = videoRec(art, key);
+    this.videoKey = key;
+    rec.el.loop = this.override === null || this.override.key === 'drag';
+    try { rec.el.currentTime = 0; } catch { /* 元数据未就绪 */ }
+    void rec.el.play().catch(() => { /* 自动播放被拦，保持占位图 */ });
+  }
+
   /** 画到独立像素层：优先原生像素图 / 立绘，缺图回落字符格。 */
   renderTo(layer: PixelLayerApi, x: number, y: number, w: number, h: number): void {
     const pk = this.pack;
@@ -367,6 +521,31 @@ export class Player implements Pet {
       const dw = sw * sc;
       const dh = sh * sc;
       layer.imageSmooth(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      return;
+    }
+    if (pk.type === 'video') {
+      const art = pk.video;
+      if (art === undefined) return;
+      this.syncVideo();
+      const rec = videoRecs[`${art.dir}${this.videoKey}`];
+      if (rec !== undefined && rec.ready && !rec.bad && rec.el.readyState >= 2) {
+        const sw = rec.el.videoWidth || art.size[0];
+        const sh = rec.el.videoHeight || art.size[1];
+        const sc = Math.min(w / sw, h / sh);
+        const dw = sw * sc;
+        const dh = sh * sc;
+        layer.videoAt(rec.el, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        return;
+      }
+      const poster = this.poster;
+      if (poster !== null && poster.complete && poster.naturalWidth > 0) {
+        const sw = poster.naturalWidth;
+        const sh = poster.naturalHeight;
+        const sc = Math.min(w / sw, h / sh);
+        const dw = sw * sc;
+        const dh = sh * sc;
+        layer.imageSmooth(poster, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      }
       return;
     }
     if (pk.type === 'sheet') {
@@ -510,6 +689,13 @@ function prefetch(skin: SkinId): void {
   if (conn?.effectiveType === 'slow-2g' || conn?.effectiveType === '2g') return;
   if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-data: reduce)').matches) return;
 
+  // 视频形象：只暖自己的 22 个文件（每个 ~1MB），不跟精灵图混排
+  const vid = VIDEOS[skin];
+  if (vid !== undefined) {
+    prefetchVideo(vid);
+    return;
+  }
+
   // 当前形象插到队首（从队列里摘掉重排，保证换肤后优先级立即生效）
   const priority = prefetchUrls(skin);
   for (const url of priority) {
@@ -552,6 +738,11 @@ export const PetKit: PetKitApi = {
     }
     const art = SHEETS[skin];
     if (art !== undefined) imageAnim(art, 'idle');
+    const vid = VIDEOS[skin];
+    if (vid !== undefined) {
+      posterFor(vid);
+      videoRec(vid, 'idle');
+    }
   },
   prefetch,
   PORTRAITS,

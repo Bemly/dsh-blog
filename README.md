@@ -88,6 +88,7 @@ assets/
   whale-maid-sheet/     鲸娘女仆 Q 版插画精灵图（22 张 / 384 帧，489×709）
   whale-maid-anime-sheet/ 鲸娘女仆动画精灵图（22 张 / 880 帧，540×540）
   whale-maid-plush-sheet/ 鲸娘女仆毛绒精灵图（22 张 / 348 帧，630×819）
+  whale-maid-video/    鲸娘 · 大肥鱼 视频轨：22 个动画 × 97 帧（720×1280 VP9 alpha）+ poster.avif
   portraits/            高清立绘：whale-girl（女仆鲸娘，normal + happy）
 blog/
   blog.config.json      标题 / 入口文件 / 图片目录 / 排除项 / 排序 / AVIF 编码参数
@@ -108,6 +109,7 @@ blog/
 | `whale-maid` | 鲸娘 · 女仆 Q版 | 插画序列帧 22 动画 / 384 帧（489×709） | `assets/whale-maid-sheet/` |
 | `whale-maid-anime` | 鲸娘 · 女仆 动画 | 插画序列帧 22 动画 / 880 帧（540×540，源 720 缩 0.75） | `assets/whale-maid-anime-sheet/` |
 | `whale-maid-plush` | 鲸娘 · 女仆 毛绒 | 插画序列帧 22 动画 / 348 帧（630×819，源 964×1252 缩 0.654） | `assets/whale-maid-plush-sheet/` |
+| `whale-maid-video` | 鲸娘 · 大肥鱼 | 视频序列帧 22 动画 / 2134 帧（720×1280，VP9 alpha） | `assets/whale-maid-video/` |
 
 - 选择入口：顶栏「菜单」→「切换宠物形象」，或设置页「宠物形象 skin」→ 弹层选择器
   （左侧名册 + 右侧实时预览，`↑↓` 选、`Enter` 应用、`Esc` 关闭）；
@@ -170,6 +172,29 @@ bun run encode:sheet <skin> <源目录> [缩放] [alphaQ]
 - 点击 → 从该形象全部动画（22 个里除 `idle` / `drag` 的 20 个）随机挑一个完整播一轮，
   时长取该动画一轮的总时长（夹在 0.9–5s）；
 - 900ms 内连点 ≥3 次 → `tickle`。
+
+## 视频素材（VP9 alpha）
+
+`whale-maid-video`（鲸娘 · 大肥鱼）没有精灵图，直接用视频当帧源：一个动画一个
+`assets/whale-maid-video/<key>.webm`，720×1280 / 24fps / **97 帧全保留**。
+
+- **为什么能画**：`drawImage` 画动图（AVIF / WebP / GIF）只取首帧，但画 `<video>` 的
+  当前帧是允许的——所以视频轨和精灵图一样能进像素层；
+- **为什么是 VP9**：只有 VP8 / VP9 能在单个文件里带 alpha，且 Chrome / Firefox / Edge
+  都保留透明。Safari 会静默丢 alpha（透明区变黑，`canPlayType` 还返回 `probably`）；
+  AV1 码流没有 alpha 平面，HEVC alpha 只有 Safari 支持；
+- **编码**（先抠图成 RGBA 序列，Vision 前景分割）：
+  ```bash
+  ffmpeg -framerate 24 -i <matte>/%03d.png -c:v libvpx-vp9 -pix_fmt yuva420p \
+    -crf 36 -b:v 0 -row-mt 1 -auto-alt-ref 0 -an assets/whale-maid-video/<key>.webm
+  ```
+  `-auto-alt-ref 0` 是 alpha 稳定所必需；少了它边缘会错位；
+- **体积**：22 个动画共 36.6 MB（单个 0.8–1.9 MB），同画质的 720p 精灵图是 112 MB；
+- **播放**（`pet.ts` 的 video 分支）：心情动画循环、点击反应播一轮后回心情、拖拽循环；
+  同时最多保留 4 个解码器（LRU），首帧没就绪时画 `poster.avif` 占位；
+- **预取**：选中该形象后按并发 2 `fetch` 全部 22 个文件暖缓存（`saveData` / 2G /
+  `prefers-reduced-data` 跳过）；
+- 换素材时 `assets/<id>/`、`src/pet.ts` 的 `VIDEOS`、`src/app.ts` 的 `SKINS` 三处要同步。
 
 ## 侧栏
 

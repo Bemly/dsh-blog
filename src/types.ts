@@ -199,6 +199,8 @@ export interface PixelLayerApi {
   begin(): void;
   end(): void;
   imageAt(img: HTMLImageElement, x: number, y: number, w: number, h: number): void;
+  /** 视频帧：高质量缩放（视频本身已是插画，不能走最近邻）。 */
+  videoAt(video: HTMLVideoElement, x: number, y: number, w: number, h: number): void;
   imageSub(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void;
   imageSubSmooth(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number): void;
   imageSmooth(img: HTMLImageElement, x: number, y: number, w: number, h: number): void;
@@ -211,7 +213,21 @@ export interface PixelLayerApi {
 export type SkinId = string;
 
 /** 宠物包类型。 */
-export type PetPackKind = 'sheet' | 'portrait' | 'none';
+export type PetPackKind = 'sheet' | 'portrait' | 'video' | 'none';
+
+/** 视频素材：一个动画一个 VP9 alpha WebM，逐帧画到像素层。 */
+export interface VideoArt {
+  /** 形如 `assets/whale-maid-video/`，运行时拼 `${dir}${key}.webm` */
+  readonly dir: string;
+  /** 单帧尺寸（视频分辨率） */
+  readonly size: readonly [number, number];
+  readonly frames: number;
+  readonly fps: number;
+  /** 该形象有哪些动画文件 */
+  readonly keys: readonly string[];
+  /** 首帧占位图（同目录） */
+  readonly poster?: string;
+}
 
 /** 精灵图素材：目录 + 单格尺寸 + 逐帧时长表。 */
 export interface SheetArt {
@@ -231,6 +247,7 @@ export interface PetPack {
   readonly anims?: Anim[];
   readonly art?: PortraitArt;
   readonly sheet?: SheetArt;
+  readonly video?: VideoArt;
 }
 
 /** 高清立绘资产。 */
