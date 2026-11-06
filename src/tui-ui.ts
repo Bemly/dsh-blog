@@ -198,12 +198,14 @@ const BIG_GLYPHS: Record<string, readonly string[]> = {
   U: ['██··██', '██··██', '██··██', '██··██', '·▀▄▄▀·'],
   O: ['·▄▀▀▄·', '██··██', '██··██', '██··██', '·▀▄▄▀·'],
   X: ['██··██', '·████·', '··██··', '·████·', '██··██'],
+  B: ['██▀▀▄▄', '██··██', '██▄▄▀▀', '██··██', '██▄▄▀▀'],
+  G: ['·▄▀▀▄▄', '██··▀▀', '██·▀▀▀', '██··██', '·▀▄▄▀▀'],
 };
 const BIG_FALLBACK: readonly string[] = ['▄▄▄▄▄▄', '██··██', '██··██', '██··██', '▀▀▀▀▀▀'];
 const GLYPH_W = 6;
 // 原版 BOLD 字距解（solveTagline：DEEPSEEK/HARNESS → 1 / 2，下排缩进 0）
-const TITLE_TOP = { text: 'DEEPSEEK', kerning: 1 };
-const TITLE_BOTTOM = { text: 'HARNESS', kerning: 2 };
+const TITLE_TOP = { text: 'BEMLY', kerning: 1 };
+const TITLE_BOTTOM = { text: 'BLOG', kerning: 2 };
 
 function mixHex(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1), 16);
