@@ -2,3 +2,5 @@ node_modules/
 dist/
 .cache/
 .DS_Store
+# blog 数据的唯一来源是 blog/，posts.ts 由 blog:build 现场生成
+src/data/posts.ts

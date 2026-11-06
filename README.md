@@ -22,15 +22,39 @@ bun run dev        # http://127.0.0.1:8899/
 
 ```bash
 bun run typecheck  # tsc --noEmit（strict，零告警）
-bun run build      # index.html → dist/（含 assets/ 与 blog 配图）
+bun run build      # blog:build + index.html → dist/（含 assets 与 blog 配图）
 bun run preview    # 预览 dist/（http://127.0.0.1:8899/）
-bun run check      # typecheck + build
+bun run check      # blog:build + typecheck + build
 bun run blog:build # 扫描 blog/，生成 src/data/posts.ts
 ```
+
+> `src/data/posts.ts` 是 `blog/` 的派生产物，**不进仓库**（`.gitignore`）。`dev` / `build` /
+> `check` 都会先跑 `blog:build` 现场生成，避免同一份正文在仓库里存两遍。
 
 > 因为入口是 ES module，`file://` 直接双击 `index.html` 不再可用（浏览器会拦
 > module 的 CORS）。请用 `bun run dev` 或 `bun run preview`，或者把 `dist/` 丢给
 > 任意静态服务器。
+
+## 部署（GitHub Pages）
+
+仓库里只放源码和内容（`blog/`），**不放构建产物**：`dist/` 与 `src/data/posts.ts`
+都在 CI 里现生成，所以同一份文章/配图不会在仓库里多存一遍。
+
+`.github/workflows/pages.yml` 在 push `main` 时执行：
+
+```
+bun install → bun run build（内含 blog:build）→ 上传 dist/ → deploy-pages
+```
+
+首次上线需要在仓库 **Settings → Pages → Build and deployment → Source** 选
+**GitHub Actions**（不是 Deploy from a branch）。之后每次推送自动发布，站点形如
+`https://<user>.github.io/dsh-blog/`。
+
+产物里的路径都是相对的（`./chunk-*.js`、`assets/…`、`blog/…`），所以部署在
+`/dsh-blog/` 这样的子路径下也能直接用，不需要改 base。
+
+> CI 里用 `apt-get install ffmpeg libavif-bin` 提供 `ffprobe` / `avifenc`：
+> `blog:build` 要用前者读尺寸，遇到非 AVIF 图才会用后者转码。
 
 ## 目录
 
@@ -54,7 +78,7 @@ src/
   data/
     whalegirl.ts        鲸娘 42×30 字符格帧包（精灵图未就绪时回落）
     timings.ts          各角色逐帧时长表（ms）
-    posts.ts            文章数据（自动生成：标题 / 摘要 / Markdown 正文）
+    posts.ts            文章数据（blog:build 生成，不入库）
 assets/
   whalegirl-sheet/      鲸娘 AVIF 精灵图：<动画>.avif（22 张，运行时用这个）
   claude-girl-sheet/    Claude 娘 AVIF 精灵图（22 张 / 225 帧）

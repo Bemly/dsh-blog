@@ -6,13 +6,13 @@
   "description": "dsh-TUI 的 Web 版「Canvas 真 TUI」",
   "license": "BSD-3-Clause",
   "scripts": {
-    "dev": "bun run serve.ts",
-    "build": "bun run build.ts",
+    "dev": "bun run blog:build && bun run serve.ts",
+    "build": "bun run blog:build && bun run build.ts",
     "preview": "bun run preview.ts",
     "encode:sheet": "bun run tools/encode-sheet.ts",
     "blog:build": "bun run tools/build-blog.ts",
     "typecheck": "tsc --noEmit",
-    "check": "bun run typecheck && bun run build"
+    "check": "bun run blog:build && bun run typecheck && bun run build.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

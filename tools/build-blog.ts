@@ -51,6 +51,29 @@ function probe(file: string): [number, number] {
   return [w ?? 0, h ?? 0];
 }
 
+/** 直接从 AVIF 的 ispe box 读宽高：省掉 587 次 ffprobe 进程启动。 */
+function avifSize(buf: Uint8Array): [number, number] {
+  let best: [number, number] = [0, 0];
+  for (let i = 0; i + 16 <= buf.length; i++) {
+    if (buf[i] !== 0x69 || buf[i + 1] !== 0x73 || buf[i + 2] !== 0x70 || buf[i + 3] !== 0x65) continue;
+    // ispe：size(4) 'ispe'(4) version+flags(4) width(4) height(4)
+    const width = (buf[i + 8] << 24 | buf[i + 9] << 16 | buf[i + 10] << 8 | buf[i + 11]) >>> 0;
+    const height = (buf[i + 12] << 24 | buf[i + 13] << 16 | buf[i + 14] << 8 | buf[i + 15]) >>> 0;
+    if (width > 0 && height > 0 && width < 20000 && height < 20000 && width * height > best[0] * best[1]) {
+      best = [width, height];
+    }
+  }
+  return best;
+}
+
+function sizeOf(file: string): [number, number] {
+  if (extname(file).toLowerCase() === '.avif') {
+    const size = avifSize(new Uint8Array(readFileSync(file)));
+    if (size[0] > 0) return size;
+  }
+  return probe(file);
+}
+
 function encode(src: string, cfg: BlogConfig): string {
   const quality = String(cfg.image?.quality ?? 60);
   const alpha = String(cfg.image?.alphaQuality ?? 60);
@@ -120,7 +143,7 @@ for (const entry of entries) {
     const encoded = encode(abs, cfg);
     const rel = encoded.slice(postDir.length + 1).split('\\').join('/');
     const web = 'blog/' + dir + '/' + rel;
-    const [w, h] = probe(encoded);
+    const [w, h] = sizeOf(encoded);
     if (w > 0 && h > 0) sizes[web] = [w, h];
     imageCount += 1;
     return '![' + alt + '](' + web + ')';

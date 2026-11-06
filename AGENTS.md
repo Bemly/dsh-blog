@@ -11,14 +11,17 @@
 
 ```bash
 bun install            # 只装 typescript + @types/bun
-bun run dev            # http://127.0.0.1:8899/，现场转译 .ts，改代码刷新即生效
-bun run check          # typecheck + build，提交前必跑
-bun run build          # → dist/（含 assets 与 blog 配图）
+bun run dev            # blog:build + dev server（http://127.0.0.1:8899/）
+bun run check          # blog:build + typecheck + build，提交前必跑
+bun run build          # blog:build + dist/（含 assets 与 blog 配图）
 bun run preview        # 预览 dist/
 
 bun run encode:sheet <skin> <源目录> [缩放|WxH=1] [alphaQ=60]
-bun run blog:build                             # blog/ → src/data/posts.ts
+bun run blog:build                             # blog/ → src/data/posts.ts（不入库）
 ```
+
+> `src/data/posts.ts` 与 `dist/` 都是派生产物、已在 `.gitignore`：文章/配图只在
+> `blog/` 存一份，CI（`.github/workflows/pages.yml`）构建时现生成再发 Pages。
 
 ## 提交与推送（硬性）
 
@@ -99,7 +102,7 @@ blog/校园网络/images/*.avif 配图
 bun run blog:build         # 扫描 blog/ → src/data/posts.ts（自动识别目录）
 ```
 
-- 只提交 `blog/`（内容）与生成物 `src/data/posts.ts`；`posts.ts` 不要手改，改完内容重跑脚本；
+- 只提交 `blog/`（内容）；`posts.ts` 由脚本生成、不入库，改完内容重跑即可；
 - 图片目录里非 AVIF 的图会按 `blog.config.json` 的 `image` 参数就地转码
   （`-q 60 --qalpha 60 -s 0`），正文引用自动改成 AVIF；
 - 整理内容时已剔除 YAML frontmatter（`AIGC:` 标签块）、「内容由 AI 生成」声明行，
