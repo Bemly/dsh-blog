@@ -525,6 +525,27 @@ function companionPetRect(): PetRect | null {
   return { x: s.x * TUI.cw, y: s.y * TUI.ch, w: s.w * TUI.cw, h: s.h * TUI.ch };
 }
 
+/** 宠物在槽位里实际占据的矩形（等比 contain 之后的可见区域，CSS 像素）。 */
+function petContentRect(slot: Rect): PetRect {
+  const sw = slot.w * TUI.cw;
+  const sh = slot.h * TUI.ch;
+  const x0 = slot.x * TUI.cw;
+  const y0 = slot.y * TUI.ch;
+  const pack = App?.pet?.pack;
+  let aw = 0;
+  let ah = 0;
+  if (pack !== undefined) {
+    // 立绘是方图；精灵图/视频用单格尺寸
+    if (pack.type === 'portrait') { aw = 1; ah = 1; }
+    else { aw = pack.size[0]; ah = pack.size[1]; }
+  }
+  if (!(aw > 0) || !(ah > 0)) return { x: x0, y: y0, w: sw, h: sh };
+  const sc = Math.min(sw / aw, sh / ah);
+  const w = aw * sc;
+  const h = ah * sc;
+  return { x: x0 + (sw - w) / 2, y: y0 + (sh - h) / 2, w, h };
+}
+
 /** 拖动偏移上限：侧栏内不出面板；窄屏浮动时放开到整页。 */
 function companionLimits(): PetDragLimits | null {
   const s = companionSlotFor();
@@ -532,11 +553,18 @@ function companionLimits(): PetDragLimits | null {
   const inPanel = App !== null && App.state.panelOpen && App.state.panelTab === 'companion' && panelWidth() > 0;
   if (inPanel) {
     const P = layout().panel;
+    // 按「看得见的宠物」算边界：槽位和侧栏一样宽时，按槽位算等于拖不动
+    const r = petContentRect(s);
+    // 左右留出边界列（左列是宽度把手），上边不压页签与分隔线
+    const minX = (P.x + 1) * TUI.cw - r.x;
+    const maxX = (P.x + P.w) * TUI.cw - (r.x + r.w);
+    const minY = (P.y + 2) * TUI.ch - r.y;
+    const maxY = (P.y + P.h) * TUI.ch - (r.y + r.h);
     return {
-      minX: Math.min(0, (P.x - s.x) * TUI.cw),
-      maxX: Math.max(0, (P.x + P.w - (s.x + s.w)) * TUI.cw),
-      minY: Math.min(0, (P.y + 2 - s.y) * TUI.ch),
-      maxY: Math.max(0, (P.y + P.h - 1 - (s.y + s.h)) * TUI.ch),
+      minX: Math.min(0, minX),
+      maxX: Math.max(0, maxX),
+      minY: Math.min(0, minY),
+      maxY: Math.max(0, maxY),
     };
   }
   // 浮动：整页可拖，只要宠物不出视口
