@@ -26,16 +26,20 @@ import { CLAUDE_GIRL_IMG, CODEX_GIRL_IMG, MAID_ANIME_IMG, MAID_IMG, PLUSH_IMG, W
 
 /** 精灵图单格尺寸（像素画统一 301×288）。 */
 const CELL: readonly [number, number] = [301, 288];
-/** 走 AVIF 精灵图轨的形象（一个动画一张图）。 */
+/**
+ * 走 AVIF 精灵图轨的形象（一个动画一张图）。
+ * inset = 单格里真正有像素的范围（量自 idle 全部帧，四周多留 2% 余量），
+ * 拖动边界按它算，否则整格透明边会把可拖范围吃掉。
+ */
 const SHEETS: Record<string, SheetArt> = {
-  whalegirl: { dir: 'assets/whalegirl-sheet/', cell: CELL, timings: WHALEGIRL_IMG },
-  'claude-girl': { dir: 'assets/claude-girl-sheet/', cell: CELL, timings: CLAUDE_GIRL_IMG },
-  'codex-girl': { dir: 'assets/codex-girl-sheet/', cell: CELL, timings: CODEX_GIRL_IMG },
+  whalegirl: { dir: 'assets/whalegirl-sheet/', cell: CELL, timings: WHALEGIRL_IMG, inset: [0.153, 0.161, 0.050, 0.053] },
+  'claude-girl': { dir: 'assets/claude-girl-sheet/', cell: CELL, timings: CLAUDE_GIRL_IMG, inset: [0.050, 0.008, 0.053, 0.000] },
+  'codex-girl': { dir: 'assets/codex-girl-sheet/', cell: CELL, timings: CODEX_GIRL_IMG, inset: [0.010, 0.015, 0.010, 0.000] },
   // 插画素材：非像素画，缩放走高质量插值
-  'whale-maid': { dir: 'assets/whale-maid-sheet/', cell: [489, 709], timings: MAID_IMG, smooth: true },
-  'whale-maid-anime': { dir: 'assets/whale-maid-anime-sheet/', cell: [540, 540], timings: MAID_ANIME_IMG, smooth: true },
+  'whale-maid': { dir: 'assets/whale-maid-sheet/', cell: [489, 709], timings: MAID_IMG, smooth: true, inset: [0.029, 0.014, 0.023, 0.000] },
+  'whale-maid-anime': { dir: 'assets/whale-maid-anime-sheet/', cell: [540, 540], timings: MAID_ANIME_IMG, smooth: true, inset: [0.011, 0.000, 0.032, 0.000] },
   // 毛绒版：单帧 630×819，保证每张精灵图都 < 4096
-  'whale-maid-plush': { dir: 'assets/whale-maid-plush-sheet/', cell: [630, 819], timings: PLUSH_IMG, smooth: true },
+  'whale-maid-plush': { dir: 'assets/whale-maid-plush-sheet/', cell: [630, 819], timings: PLUSH_IMG, smooth: true, inset: [0.137, 0.050, 0.080, 0.057] },
 };
 const PT_DIR = 'assets/portraits/';
 
@@ -61,7 +65,7 @@ const VIDEOS: Record<string, VideoArt> = {
 
 /** 高清立绘（真图）：只剩女仆鲸娘——她没有动画帧，保持静态 */
 const PORTRAITS: Record<string, PortraitArt> = {
-  'maid-girl': { dir: `${PT_DIR}whale-girl/`, normal: 'whale-girl.png', happy: 'whale-girl-happy.png' },
+  'maid-girl': { dir: `${PT_DIR}whale-girl/`, normal: 'whale-girl.png', happy: 'whale-girl-happy.png', inset: [0.101, 0.049, 0.012, 0.081] },
 };
 
 const MOOD_ANIM: Record<string, string> = {
@@ -482,6 +486,63 @@ export class Player implements Pet {
     return sheetFrameAt(this.sheet, this.currentKey(), this.time - this.currentStart());
   }
 
+  /**
+   * 槽位内真正画出来的矩形（相对槽位左上角）= 居中后的绘制矩形，再扣掉素材透明边。
+   * 拖动边界靠它：像素画按整数倍缩放、不铺满槽位，精灵图四周还有一圈透明边。
+   */
+  contentRect(w: number, h: number): { x: number; y: number; w: number; h: number } {
+    const pk = this.pack;
+    let dw = w;
+    let dh = h;
+    let inset: readonly [number, number, number, number] | undefined;
+    if (pk.type === 'sheet') {
+      const art = pk.sheet;
+      if (art === undefined) return { x: 0, y: 0, w, h };
+      const [cw0, ch0] = art.cell;
+      if (art.smooth === true) {
+        const sc = Math.min(w / cw0, h / ch0);
+        dw = cw0 * sc;
+        dh = ch0 * sc;
+      } else {
+        const dpr = window.devicePixelRatio || 1;
+        const k = Math.max(1, Math.round(dpr));
+        dw = (cw0 * k) / dpr;
+        dh = (ch0 * k) / dpr;
+        if (dw > w || dh > h) {
+          const sc = Math.min(w / dw, h / dh);
+          dw *= sc;
+          dh *= sc;
+        }
+      }
+      inset = art.inset;
+    } else if (pk.type === 'video') {
+      const art = pk.video;
+      if (art === undefined) return { x: 0, y: 0, w, h };
+      const sc = Math.min(w / art.size[0], h / art.size[1]);
+      dw = art.size[0] * sc;
+      dh = art.size[1] * sc;
+      inset = art.inset;
+    } else if (pk.type === 'portrait') {
+      const img = this.currentPortrait();
+      const iw = img?.naturalWidth ?? 0;
+      const ih = img?.naturalHeight ?? 0;
+      if (iw > 0 && ih > 0) {
+        const sc = Math.min(w / iw, h / ih);
+        dw = iw * sc;
+        dh = ih * sc;
+      } else {
+        dw = Math.min(w, h);
+        dh = dw;
+      }
+      inset = pk.art?.inset;
+    }
+    const ox = (w - dw) / 2;
+    const oy = (h - dh) / 2;
+    if (inset === undefined) return { x: ox, y: oy, w: dw, h: dh };
+    const [l, t, r, b] = inset;
+    return { x: ox + dw * l, y: oy + dh * t, w: dw * (1 - l - r), h: dh * (1 - t - b) };
+  }
+
   private currentPortrait(): HTMLImageElement | null {
     if (this.pack.type !== 'portrait') return null;
     if (this.time < this.happyUntil) {
@@ -496,8 +557,7 @@ export class Player implements Pet {
    * 视频轨：动作变了就换片源（回到开头播放）。
    * 心情动画循环；点击反应播一轮；拖拽姿态按住期间循环。
    */
-  private syncVideo(): void {
-    const art = this.video;
+  private syncVideo(): void {    const art = this.video;
     if (art === null) return;
     const key = this.currentKey();
     if (key === this.videoKey) return;

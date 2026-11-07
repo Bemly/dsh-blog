@@ -227,6 +227,8 @@ export interface VideoArt {
   readonly keys: readonly string[];
   /** 首帧占位图（同目录） */
   readonly poster?: string;
+  /** 单帧里真正有像素的范围 [左, 上, 右, 下]（占整帧比例） */
+  readonly inset?: readonly [number, number, number, number];
 }
 
 /** 精灵图素材：目录 + 单格尺寸 + 逐帧时长表。 */
@@ -237,6 +239,8 @@ export interface SheetArt {
   readonly timings: ImageTimings;
   /** 插画类素材：缩小时走高质量插值（像素画不能开，否则糊边） */
   readonly smooth?: boolean;
+  /** 单格里真正有像素的范围 [左, 上, 右, 下]（占单格的比例），拖动边界要用 */
+  readonly inset?: readonly [number, number, number, number];
 }
 
 /** 宠物当前加载的素材包。 */
@@ -255,6 +259,8 @@ export interface PortraitArt {
   readonly dir: string;
   readonly normal: string;
   readonly happy: string;
+  /** 图上真正有像素的范围 [左, 上, 右, 下]（占整图比例） */
+  readonly inset?: readonly [number, number, number, number];
 }
 
 /** 宠物实例（pet.ts 实现）。 */
@@ -271,6 +277,11 @@ export interface Pet {
   interact(): void;
   frameRows(): string[] | null;
   frameCell(): SheetFrame | null;
+  /**
+   * 槽位内真正画出来的矩形（相对槽位左上角）。
+   * 缩放规则与 renderTo 一致，并扣掉素材自带的透明边，拖动边界靠它算。
+   */
+  contentRect(w: number, h: number): { x: number; y: number; w: number; h: number };
   renderTo(layer: PixelLayerApi, x: number, y: number, w: number, h: number): void;
 }
 

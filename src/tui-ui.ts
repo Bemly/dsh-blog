@@ -525,25 +525,17 @@ function companionPetRect(): PetRect | null {
   return { x: s.x * TUI.cw, y: s.y * TUI.ch, w: s.w * TUI.cw, h: s.h * TUI.ch };
 }
 
-/** 宠物在槽位里实际占据的矩形（等比 contain 之后的可见区域，CSS 像素）。 */
+/** 宠物在槽位里实际占据的矩形（按各素材轨的真实缩放 + 透明边算，CSS 像素）。 */
 function petContentRect(slot: Rect): PetRect {
   const sw = slot.w * TUI.cw;
   const sh = slot.h * TUI.ch;
   const x0 = slot.x * TUI.cw;
   const y0 = slot.y * TUI.ch;
-  const pack = App?.pet?.pack;
-  let aw = 0;
-  let ah = 0;
-  if (pack !== undefined) {
-    // 立绘是方图；精灵图/视频用单格尺寸
-    if (pack.type === 'portrait') { aw = 1; ah = 1; }
-    else { aw = pack.size[0]; ah = pack.size[1]; }
-  }
-  if (!(aw > 0) || !(ah > 0)) return { x: x0, y: y0, w: sw, h: sh };
-  const sc = Math.min(sw / aw, sh / ah);
-  const w = aw * sc;
-  const h = ah * sc;
-  return { x: x0 + (sw - w) / 2, y: y0 + (sh - h) / 2, w, h };
+  const pet = App?.pet ?? null;
+  if (pet === null) return { x: x0, y: y0, w: sw, h: sh };
+  const r = pet.contentRect(sw, sh);
+  if (!(r.w > 0) || !(r.h > 0)) return { x: x0, y: y0, w: sw, h: sh };
+  return { x: x0 + r.x, y: y0 + r.y, w: r.w, h: r.h };
 }
 
 /** 拖动偏移上限：侧栏内不出面板；窄屏浮动时放开到整页。 */
@@ -559,7 +551,8 @@ function companionLimits(): PetDragLimits | null {
     const minX = (P.x + 1) * TUI.cw - r.x;
     const maxX = (P.x + P.w) * TUI.cw - (r.x + r.w);
     const minY = (P.y + 2) * TUI.ch - r.y;
-    const maxY = (P.y + P.h) * TUI.ch - (r.y + r.h);
+    // 往下不能越过槽位底：拖拽姿态（被拎起来）比静止态高，按可见区算会溢到状态栏
+    const maxY = (P.y + P.h) * TUI.ch - (s.y + s.h) * TUI.ch;
     return {
       minX: Math.min(0, minX),
       maxX: Math.max(0, maxX),
